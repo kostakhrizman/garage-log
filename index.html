@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f3a78">
+</head>
+<body>
+<title>Garage Log</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-column phone app. Picker -> car view (3D bay on top, service table below), bottom sheet per part. */
+:root{
+  --bg:#eef1f6; --surface:#ffffff; --ink:#141a26; --muted:#5d6779; --line:#d6dce7;
+  --accent:#1f3a78; --accent-ink:#ffffff; --stage:#dfe5ef;
+  --ok:#1d8a55; --soon:#c27a06; --late:#c4322b; --none:#8a93a3;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d121c; --surface:#161d2b; --ink:#e7ebf3; --muted:#9aa4b7; --line:#283247;
+  --accent:#7ea2ff; --accent-ink:#0b1020; --stage:#121a28;
+  --ok:#3fbf7f; --soon:#e9a53a; --late:#ff6a5f; --none:#7b8597; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d121c; --surface:#161d2b; --ink:#e7ebf3; --muted:#9aa4b7; --line:#283247;
+  --accent:#7ea2ff; --accent-ink:#0b1020; --stage:#121a28;
+  --ok:#3fbf7f; --soon:#e9a53a; --late:#ff6a5f; --none:#7b8597; color-scheme:dark}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));}
+.app{max-width:720px;margin:0 auto;padding-block:14px 40px;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:30px;line-height:1.05}
+h2{font-size:22px}
+.eyebrow{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.banner{font-size:13px;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:8px 12px}
+
+/* picker */
+.cars{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.car-card{display:flex;flex-direction:column;gap:10px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;transition:transform .15s}
+.car-card:active{transform:scale(.985)}
+.car-card svg,.car-card .carpic{width:100%;height:auto;max-width:100%;display:block}
+.car-card .carpic{aspect-ratio:720/400;background:radial-gradient(90% 70% at 50% 75%,var(--stage),transparent);border-radius:12px}
+.car-card .meta{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.car-card .yr{color:var(--muted);font-size:14px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.s-ok{color:var(--ok)} .s-soon{color:var(--soon)} .s-late{color:var(--late)} .s-none{color:var(--none)}
+
+/* car view */
+.topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.back{border:1px solid var(--line);background:var(--surface);border-radius:10px;width:40px;height:40px;display:grid;place-items:center;flex:none}
+.topbar .t{min-width:0;flex:1 1 150px}
+.odo{display:flex;align-items:center;gap:8px;background:var(--ink);color:var(--bg);border-radius:10px;padding:6px 10px;flex:none}
+.odo label{font-family:var(--f-display);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.75}
+.odo input{width:92px;background:transparent;border:0;color:inherit;font-family:var(--f-display);font-size:20px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums;padding:0}
+.odo input::-webkit-inner-spin-button{display:none}
+.odo span{font-size:12px;opacity:.75}
+.stage{position:relative;height:min(58vh,440px);min-height:300px;border-radius:18px;overflow:hidden;background:radial-gradient(120% 90% at 50% 70%,var(--surface),var(--stage));border:1px solid var(--line);touch-action:none}
+.stage canvas{display:block;width:100%;height:100%}
+.labels{position:absolute;inset:0;pointer-events:none}
+.tag{position:absolute;left:0;top:0;transform:translate(-50%,-130%);pointer-events:auto;display:flex;align-items:center;gap:6px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 10px 5px 7px;font-size:12.5px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px rgba(10,20,40,.18)}
+.tag i{width:9px;height:9px;border-radius:50%;background:var(--none);flex:none}
+.tag.hood{background:var(--accent);color:var(--accent-ink);border-color:transparent;padding:7px 12px}
+.hint{position:absolute;left:12px;bottom:10px;right:12px;font-size:12.5px;color:var(--muted);pointer-events:none;display:flex;justify-content:space-between;gap:8px}
+.hoodbtn{position:absolute;right:max(10px,env(safe-area-inset-right,0px));top:10px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 12px;font-weight:600;font-size:13px}
+
+.table{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.thead,.row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.1fr) auto;gap:10px;align-items:center;padding:11px 14px}
+.thead{font-family:var(--f-display);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+.row{border:0;border-bottom:1px solid var(--line);background:none;width:100%;text-align:left}
+.row:last-child{border-bottom:0}
+.row:active{background:var(--bg)}
+.row .name{font-weight:600}
+.row .sub{font-size:12.5px;color:var(--muted)}
+.row .cell{min-width:0;font-size:13.5px}
+@media (max-width:520px){
+  .thead{display:none}
+  .row{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}
+  .row .c-last,.row .c-next{grid-column:1 / -1;font-size:13px}
+  .row .c-status{grid-row:1;grid-column:2}
+  .row .c-last::before{content:"Last: ";color:var(--muted)}
+  .row .c-next::before{content:"Next: ";color:var(--muted)}
+}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(5,10,20,.45);z-index:20}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-height:88vh;overflow:auto;background:var(--surface);border-radius:20px 20px 0 0;
+  padding:18px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  display:flex;flex-direction:column;gap:16px;max-width:720px;margin:0 auto;box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+.sheet .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.x{border:1px solid var(--line);background:none;border-radius:10px;width:36px;height:36px;flex:none}
+.box{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:12px;color:var(--muted);font-weight:600}
+.field input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 10px;width:100%;min-width:0;box-sizing:border-box}
+.primary{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:11px 14px;font-weight:600}
+.ghost{background:none;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-weight:600}
+.hist{display:flex;flex-direction:column}
+.hist .h{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);align-items:center}
+.hist .h:last-child{border-bottom:0}
+.del{background:none;border:0;color:var(--muted);font-size:13px;padding:6px}
+.del.armed{color:var(--late);font-weight:600}
+.empty{color:var(--muted);font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-weight:600;font-size:14px;z-index:30}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="app" id="app">
+  <section id="picker" class="app" style="padding:0">
+    <div>
+      <div class="eyebrow">Service record</div>
+      <h1>Which car?</h1>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+    <div class="cars" id="cars"></div>
+  </section>
+
+  <section id="carview" hidden style="display:flex;flex-direction:column;gap:14px">
+    <div class="topbar">
+      <button class="back" id="back" aria-label="Back to cars">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="t">
+        <div class="eyebrow" id="cv-year"></div>
+        <h2 id="cv-name"></h2>
+      </div>
+      <div class="odo">
+        <label for="odo">km</label>
+        <input id="odo" class="num" type="number" inputmode="numeric" min="0" step="1">
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="labels" id="labels"></div>
+      <button class="hoodbtn" id="hoodbtn">Open hood</button>
+      <div class="hint"><span id="hint">Tap the hood to open it · drag to turn</span></div>
+    </div>
+    <div class="table" id="table"></div>
+  </section>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sh-title"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+/* ---------- static data ---------- */
+const PARTS = [
+  {id:"oil",        name:"Oil & oil filter",    km:15000,  mo:12, where:"bay"},
+  {id:"airfilter",  name:"Air filter",          km:40000,  mo:24, where:"bay"},
+  {id:"sparkplugs", name:"Spark plugs",         km:50000,  mo:48, where:"bay"},
+  {id:"coolant",    name:"Coolant flush",       km:50000,  mo:36, where:"bay"},
+  {id:"brakefluid", name:"Brake fluid",         km:null,   mo:24, where:"bay"},
+  {id:"battery",    name:"Battery",             km:null,   mo:48, where:"bay"},
+  {id:"timingbelt", name:"Timing belt",         km:80000,  mo:60, where:"bay"},
+  {id:"cabinfilter",name:"Cabin / AC filter",   km:15000,  mo:12, where:"bay"},
+  {id:"wipers",     name:"Wiper blades",        km:null,   mo:12, where:"out"},
+  {id:"tires",      name:"Tires",               km:40000,  mo:36, where:"out"},
+  {id:"brakepads",  name:"Brake pads",          km:30000,  mo:36, where:"out"},
+  {id:"brakediscs", name:"Brake discs",         km:60000,  mo:60, where:"none"},
+  {id:"serpentine", name:"Serpentine belt",     km:80000,  mo:60, where:"none"},
+  {id:"gearbox",    name:"Transmission fluid",  km:60000,  mo:48, where:"none"},
+  {id:"alignment",  name:"Wheel alignment",     km:20000,  mo:24, where:"none"},
+  {id:"ac",         name:"AC service / regas",  km:null,   mo:24, where:"none"},
+  {id:"inspection", name:"Annual test (Tofes 17)", km:null, mo:12, where:"none"},
+];
+const PART = Object.fromEntries(PARTS.map(p=>[p.id,p]));
+
+const CARS = {
+  ateca:{id:"ateca",name:"SEAT Ateca",year:"2017 · Navy blue",color:"#0e1a3c",metal:0.4,
+    L:4.36,W:1.84,r:0.355,axles:[1.31,-1.33],cowlX:0.92,bay:0.62,beltY:1.14,beltRise:0.02,tumble:0.16,rt:0.16,suv:true,
+    roofRear:-1.98,roofFront:0.10,rwX:-2.14,sgX:-1.86,
+    top:[[-2.18,0.98],[-2.15,1.22],[-1.98,1.58],[-1.6,1.62],[0.10,1.64],[0.92,1.10],[1.9,1.03],[2.12,0.92],[2.18,0.78]],
+    bot:[[-2.18,0.50],[-2.0,0.34],[1.85,0.34],[2.18,0.46]],
+    cowl:[0.92,1.08],
+    body:[[-2.15,0.32],[-2.18,0.92],[-2.16,1.18],[-1.98,1.60],[0.10,1.63],[0.92,1.08],[0.92,0.84],[2.14,0.84],[2.18,0.70],[2.16,0.32]],
+    glass:[[0.80,1.205],[0.174,1.625],[-2.03,1.62],[-2.196,1.20],[-2.0,1.16],[0.80,1.16]], bpillar:-0.55},
+  ibiza:{id:"ibiza",name:"SEAT Ibiza",year:"2016 · White",color:"#f3f4f6",metal:0.05,
+    L:4.06,W:1.69,r:0.31,axles:[1.24,-1.23],cowlX:0.78,bay:0.52,beltY:1.02,beltRise:0.03,tumble:0.18,rt:0.14,suv:false,
+    roofRear:-1.76,roofFront:-0.02,rwX:-1.99,sgX:-1.74,
+    top:[[-2.03,0.88],[-2.0,1.06],[-1.76,1.40],[-1.4,1.45],[-0.02,1.46],[0.78,1.00],[1.75,0.93],[1.98,0.82],[2.03,0.68]],
+    bot:[[-2.03,0.42],[-1.85,0.26],[1.80,0.26],[2.03,0.38]],
+    cowl:[0.78,0.98],
+    body:[[-2.0,0.28],[-2.03,0.84],[-2.0,1.06],[-1.76,1.42],[-0.02,1.45],[0.78,0.98],[0.78,0.74],[1.99,0.74],[2.03,0.62],[2.01,0.28]],
+    glass:[[0.678,1.085],[0.065,1.445],[-1.82,1.44],[-2.035,1.08],[-1.9,1.04],[0.678,1.04]], bpillar:-0.6},
+};
+
+/* ---------- store (shared db, falls back to this device) ---------- */
+const S = {services:{}, cars:{}, intervals:{}, mode:"loading"};
+let db = null;
+const LKEY = "garage-log-local";
+function loadLocal(){ try{ const j=JSON.parse(localStorage.getItem(LKEY)||"{}"); S.services=j.services||{}; S.cars=j.cars||{}; S.intervals=j.intervals||{}; }catch(e){} }
+function saveLocal(){ try{ localStorage.setItem(LKEY, JSON.stringify({services:S.services,cars:S.cars,intervals:S.intervals})); }catch(e){} }
+
+async function initStore(){
+  const timer = setTimeout(()=>{ if(S.mode==="loading"){ setBanner("Can't reach your saved records yet. Showing what this device has."); } }, 10000);
+  try{ db = window.claude && window.claude.use ? await window.claude.use("db") : null; }catch(e){ db=null; }
+  if(!db){ clearTimeout(timer); S.mode="local"; loadLocal(); setBanner("Records are saved on this device only."); renderAll(); return; }
+  S.mode="db";
+  const sub = (coll, key) => db.collection(coll).onSnapshot(snap=>{
+    const o={}; snap.docs.forEach(d=>{ o[d.id]=d.data(); }); S[key]=o;
+    if(!snap.metadata.fromCache){ clearTimeout(timer); setBanner(""); }
+    renderAll();
+  }, err=>{ clearTimeout(timer); setBanner("Records could not load ("+err.code+")."); });
+  sub("services","services"); sub("cars","cars"); sub("intervals","intervals");
+}
+async function addService(rec){
+  if(db){ await db.collection("services").add(rec); }
+  else { S.services["l"+Date.now()]=rec; saveLocal(); renderAll(); }
+}
+async function deleteService(id){
+  if(db){ await db.doc("services/"+id).delete(); } else { delete S.services[id]; saveLocal(); renderAll(); }
+}
+async function setCarKm(carId, km){
+  const body={km, updatedAt:new Date().toISOString()};
+  if(db){ await db.doc("cars/"+carId).set(body); } else { S.cars[carId]=body; saveLocal(); renderAll(); }
+}
+async function setInterval_(carId, partId, km, mo){
+  const cur = Object.assign({}, S.intervals[carId]||{}); cur[partId]={km, mo};
+  if(db){ await db.doc("intervals/"+carId).set(cur); } else { S.intervals[carId]=cur; saveLocal(); renderAll(); }
+}
+
+/* ---------- logic ---------- */
+const today = ()=>{ const d=new Date(); d.setHours(0,0,0,0); return d; };
+const iso = d=> d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const parse = s=>{ const [y,m,d]=String(s).split("-").map(Number); return new Date(y,(m||1)-1,d||1); };
+const fmtDate = s=>{ if(!s) return "—"; const d=parse(s); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear(); };
+const fmtKm = n=> (n==null||n==="")?"—":Number(n).toLocaleString("en-US")+" km";
+const addMonths=(d,m)=>{ const x=new Date(d); x.setMonth(x.getMonth()+m); return x; };
+
+function recordsFor(carId, partId){
+  return Object.entries(S.services).map(([id,r])=>Object.assign({id},r))
+    .filter(r=>r.car===carId && (!partId || r.part===partId))
+    .sort((a,b)=> (b.date||"").localeCompare(a.date||"") || (b.km||0)-(a.km||0));
+}
+function currentKm(carId){
+  const set = S.cars[carId] && S.cars[carId].km;
+  const maxRec = Math.max(0, ...recordsFor(carId).map(r=>Number(r.km)||0));
+  return Math.max(Number(set)||0, maxRec) || null;
+}
+function intervalOf(carId, partId){
+  const o = S.intervals[carId] && S.intervals[carId][partId];
+  const p = PART[partId];
+  return o ? {km:o.km??null, mo:o.mo??null} : {km:p.km, mo:p.mo};
+}
+function statusOf(carId, partId){
+  const last = recordsFor(carId, partId)[0];
+  const iv = intervalOf(carId, partId);
+  if(!last) return {s:"none", label:"No record", last:null, iv};
+  const curKm = currentKm(carId);
+  let dueKm=null, dueDate=null, s="ok", leftKm=null, leftDays=null;
+  if(iv.km && last.km!=null && last.km!==""){ dueKm = Number(last.km)+Number(iv.km); if(curKm!=null) leftKm = dueKm-curKm; }
+  if(iv.mo && last.date){ dueDate = addMonths(parse(last.date), Number(iv.mo)); leftDays = Math.round((dueDate-today())/864e5); }
+  if((leftKm!=null && leftKm<0) || (leftDays!=null && leftDays<0)) s="late";
+  else if((leftKm!=null && leftKm<1500) || (leftDays!=null && leftDays<45)) s="soon";
+  const label = s==="late"?"Overdue": s==="soon"?"Due soon":"OK";
+  return {s,label,last,iv,dueKm,dueDate,leftKm,leftDays};
+}
+function nextText(st){
+  if(!st.last) return "Log the last change";
+  const bits=[]; if(st.dueDate) bits.push(fmtDate(iso(st.dueDate))); if(st.dueKm) bits.push(fmtKm(st.dueKm));
+  return bits.join(" or ")||"—";
+}
+const RANK={late:0,soon:1,none:2,ok:3};
+
+/* ---------- UI ---------- */
+const $=id=>document.getElementById(id);
+let current=null;
+function setBanner(t){ const b=$("banner"); b.textContent=t; b.hidden=!t; }
+function toast(t){ const el=$("toast"); el.textContent=t; el.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>el.hidden=true,1800); }
+
+function silhouette(c){
+  const pts = c.top.concat(c.bot.slice().reverse()).map(([x,y])=>`${(x+2.3)*60},${(1.8-y)*60}`).join(" ");
+  const gl = c.glass.map(([x,y])=>`${(x+2.3)*60},${(1.8-y)*60}`).join(" ");
+  const w = c.axles.map(x=>`<circle cx="${(x+2.3)*60}" cy="${(1.8-c.r)*60}" r="${c.r*60}" fill="var(--ink)"/><circle cx="${(x+2.3)*60}" cy="${(1.8-c.r)*60}" r="${c.r*32}" fill="var(--muted)"/>`).join("");
+  return `<svg viewBox="0 0 276 112" aria-hidden="true"><polygon points="${pts}" fill="${c.color}" stroke="var(--line)" stroke-width="1"/><polygon points="${gl}" fill="#1a2232" opacity=".85"/>${w}</svg>`;
+}
+function renderPicker(){
+  $("cars").innerHTML = Object.values(CARS).map(c=>{
+    const sts = PARTS.map(p=>statusOf(c.id,p.id).s);
+    const n = k=>sts.filter(s=>s===k).length;
+    const km = currentKm(c.id);
+    const pills = [n("late")?`<span class="pill s-late">${n("late")} overdue</span>`:"", n("soon")?`<span class="pill s-soon">${n("soon")} due soon</span>`:"",
+      n("ok")?`<span class="pill s-ok">${n("ok")} OK</span>`:"", n("none")?`<span class="pill s-none">${n("none")} no record</span>`:""].join("");
+    const pic = Viewer.thumb(c);
+    return `<button class="car-card" data-car="${c.id}">${pic?`<img class="carpic" src="${pic}" alt="${c.name}, ${c.year}">`:silhouette(c)}
+      <div class="meta"><h2>${c.name}</h2><span class="yr">${c.year}</span></div>
+      <div class="meta"><span class="num">${km?fmtKm(km):"Odometer not set"}</span></div>
+      <div class="pills">${pills}</div></button>`;
+  }).join("");
+}
+function renderTable(){
+  if(!current) return;
+  const rows = PARTS.map(p=>({p, st:statusOf(current.id,p.id)})).sort((a,b)=>RANK[a.st.s]-RANK[b.st.s]);
+  $("table").innerHTML = `<div class="thead"><span>Part</span><span>Last replaced</span><span>Next due</span><span>Status</span></div>` +
+    rows.map(({p,st})=>`<button class="row" data-part="${p.id}">
+      <span class="cell"><span class="name">${p.name}</span><br><span class="sub">${ivText(intervalOf(current.id,p.id))}</span></span>
+      <span class="cell c-last num">${st.last?fmtDate(st.last.date)+(st.last.km?" · "+fmtKm(st.last.km):""):"—"}</span>
+      <span class="cell c-next num">${nextText(st)}</span>
+      <span class="cell c-status"><span class="pill s-${st.s}">${st.label}</span></span></button>`).join("");
+}
+function ivText(iv){ const b=[]; if(iv.km) b.push(Number(iv.km).toLocaleString("en-US")+" km"); if(iv.mo) b.push(iv.mo>=12&&iv.mo%12===0?(iv.mo/12)+(iv.mo===12?" year":" years"):iv.mo+" months"); return b.length?"Every "+b.join(" / "):"No interval"; }
+function renderAll(){
+  renderPicker();
+  if(current){ renderTable(); if(document.activeElement!==$("odo")) $("odo").value = currentKm(current.id)||""; Viewer.refreshStatus(); }
+  if(openPart) renderSheet();
+}
+
+/* navigation via hash */
+function route(){
+  const id = location.hash.slice(1);
+  if(CARS[id]) showCar(id); else showPicker();
+}
+function showPicker(){ current=null; closeSheet(); $("carview").hidden=true; $("picker").hidden=false; Viewer.stop(); renderPicker(); }
+function showCar(id){
+  current=CARS[id]; $("picker").hidden=true; $("carview").hidden=false;
+  $("cv-name").textContent=current.name; $("cv-year").textContent=current.year;
+  $("odo").value=currentKm(id)||""; renderTable(); Viewer.load(current); window.scrollTo(0,0);
+}
+$("cars").addEventListener("click",e=>{ const b=e.target.closest("[data-car]"); if(b) location.hash=b.dataset.car; });
+$("back").addEventListener("click",()=>{ location.hash=""; history.replaceState(null,"",location.pathname+location.search); route(); });
+$("table").addEventListener("click",e=>{ const r=e.target.closest("[data-part]"); if(r) openSheet(r.dataset.part); });
+$("odo").addEventListener("change",async e=>{
+  const v=Math.round(Number(e.target.value)); if(!current||!(v>=0)) return;
+  try{ await setCarKm(current.id,v); toast("Odometer saved"); }catch(err){ toast("Could not save: "+(err.code||"error")); }
+});
+window.addEventListener("hashchange",route);
+
+/* ---------- part sheet ---------- */
+let openPart=null, armedDel=null;
+function openSheet(pid){ openPart=pid; armedDel=null; renderSheet(true); $("scrim").hidden=false; $("sheet").hidden=false; }
+function closeSheet(){ openPart=null; $("scrim").hidden=true; $("sheet").hidden=true; }
+$("scrim").addEventListener("click",closeSheet);
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
+function renderSheet(fresh){
+  if(!current||!openPart) return;
+  const p=PART[openPart], st=statusOf(current.id,p.id), iv=intervalOf(current.id,p.id), hist=recordsFor(current.id,p.id);
+  const keep = fresh?null:{d:$("f-date")?.value,k:$("f-km")?.value,c:$("f-cost")?.value,n:$("f-note")?.value};
+  $("sheet").innerHTML = `
+    <div class="head"><div><div class="eyebrow">${current.name}</div><h2 id="sh-title">${p.name}</h2>
+      <div style="margin-top:6px" class="pills"><span class="pill s-${st.s}">${st.label}</span><span class="num" style="font-size:13.5px;color:var(--muted)">Next: ${nextText(st)}</span></div></div>
+      <button class="x" id="sh-x" aria-label="Close">✕</button></div>
+    <form class="box" id="f-add"><h3 style="font-size:17px">Log a replacement</h3>
+      <div class="grid2">
+        <div class="field"><label for="f-date">Date</label><input id="f-date" type="date" required value="${iso(today())}"></div>
+        <div class="field"><label for="f-km">Odometer (km)</label><input id="f-km" type="number" inputmode="numeric" min="0" value="${currentKm(current.id)||""}"></div>
+        <div class="field"><label for="f-cost">Cost ₪ (optional)</label><input id="f-cost" type="number" inputmode="decimal" min="0" step="any"></div>
+        <div class="field"><label for="f-note">Note (optional)</label><input id="f-note" type="text" placeholder="Garage, brand…"></div>
+      </div>
+      <button class="primary" type="submit">Save replacement</button></form>
+    <div class="box"><h3 style="font-size:17px">History</h3>
+      <div class="hist">${hist.length? hist.map(r=>`<div class="h"><div><div class="num" style="font-weight:600">${fmtDate(r.date)}${r.km?" · "+fmtKm(r.km):""}</div>
+        ${(r.note||r.cost)?`<div style="font-size:13px;color:var(--muted)">${[r.note?esc(r.note):"", r.cost?("₪"+esc(r.cost)):""].filter(Boolean).join(" · ")}</div>`:""}</div>
+        <button class="del ${armedDel===r.id?"armed":""}" data-del="${r.id}">${armedDel===r.id?"Tap again to delete":"Delete"}</button></div>`).join("")
+        : `<div class="empty">Nothing logged yet for this part.</div>`}</div></div>
+    <form class="box" id="f-iv"><h3 style="font-size:17px">Replace every</h3>
+      <div class="grid2">
+        <div class="field"><label for="iv-km">Kilometres</label><input id="iv-km" type="number" inputmode="numeric" min="0" value="${iv.km??""}" placeholder="—"></div>
+        <div class="field"><label for="iv-mo">Months</label><input id="iv-mo" type="number" inputmode="numeric" min="0" value="${iv.mo??""}" placeholder="—"></div>
+      </div>
+      <button class="ghost" type="submit">Save interval</button></form>`;
+  if(keep){ if(keep.d!=null)$("f-date").value=keep.d; if(keep.k!=null)$("f-km").value=keep.k; if(keep.c!=null)$("f-cost").value=keep.c; if(keep.n!=null)$("f-note").value=keep.n; }
+  $("sh-x").onclick=closeSheet;
+  $("f-add").onsubmit=async e=>{ e.preventDefault();
+    const km=$("f-km").value===""?null:Math.round(Number($("f-km").value));
+    const rec={car:current.id, part:openPart, date:$("f-date").value, km, note:$("f-note").value.trim(), cost:$("f-cost").value, createdAt:new Date().toISOString()};
+    try{ await addService(rec);
+      if(km && km>(Number(S.cars[current.id]?.km)||0)) await setCarKm(current.id,km);
+      toast("Saved"); renderSheet(true); }catch(err){ toast("Could not save: "+(err.code||"error")); } };
+  $("f-iv").onsubmit=async e=>{ e.preventDefault();
+    const k=$("iv-km").value===""?null:Number($("iv-km").value), m=$("iv-mo").value===""?null:Number($("iv-mo").value);
+    try{ await setInterval_(current.id,openPart,k,m); toast("Interval saved"); }catch(err){ toast("Could not save: "+(err.code||"error")); } };
+  $("sheet").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.del; if(armedDel!==id){ armedDel=id; renderSheet(); return; }
+    armedDel=null; try{ await deleteService(id); toast("Deleted"); }catch(err){ toast("Could not delete"); } renderSheet(); });
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ---------- 3D viewer ---------- */
+const Viewer = (()=>{
+  let renderer, scene, camera, controls, raf=null, car=null, hoodPivot=null, hoodMesh=null, hoodTarget=0, hoodAngle=0;
+  let spots=[], tags=[], hoodTag=null, camGoal=null, spec=null;
+  const stage=$("stage"), labels=$("labels");
+  const tok=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim()||"#888";
+
+  function init(){
+    if(renderer) return true;
+    if(!window.THREE){ $("hint").textContent="3D view could not load. The table below still works."; return false; }
+    renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+    renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+    renderer.outputEncoding=THREE.sRGBEncoding;
+    renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.0;
+    renderer.localClippingEnabled=true;
+    stage.insertBefore(renderer.domElement, labels);
+    scene=new THREE.Scene();
+    camera=new THREE.PerspectiveCamera(36,1,0.1,100);
+    // studio reflections: a soft sky dome with a few bright softbox panels
+    try{
+      const env=new THREE.Scene(), sg=new THREE.SphereGeometry(20,32,16), pa=sg.attributes.position, cols=[];
+      for(let i=0;i<pa.count;i++){ const y=pa.getY(i)/20; if(y>0) cols.push(0.70+0.3*y,0.74+0.26*y,0.82+0.18*y); else cols.push(0.16,0.16,0.17); }
+      sg.setAttribute("color",new THREE.Float32BufferAttribute(cols,3));
+      env.add(new THREE.Mesh(sg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
+      const panel=(x,y,z,w,h,k)=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(k,k,k),side:THREE.DoubleSide})); m.position.set(x,y,z); m.lookAt(0,0,0); env.add(m); };
+      panel(0,14,0,16,5,3); panel(12,6,7,7,3,2.2); panel(-12,5,-7,7,3,1.6); panel(0,4,-14,10,2,1.2);
+      const pm=new THREE.PMREMGenerator(renderer); scene.environment=pm.fromScene(env,0.03).texture;
+    }catch(e){}
+    scene.add(new THREE.HemisphereLight(0xffffff,0x3a4152,0.45));
+    const d=new THREE.DirectionalLight(0xffffff,1.1); d.position.set(4,7,5); scene.add(d);
+    const d2=new THREE.DirectionalLight(0xbfd0ff,0.35); d2.position.set(-5,3,-4); scene.add(d2);
+    // soft floor shadow
+    const cv=document.createElement("canvas"); cv.width=cv.height=128; const g=cv.getContext("2d");
+    const grd=g.createRadialGradient(64,64,4,64,64,64); grd.addColorStop(0,"rgba(0,0,0,.45)"); grd.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle=grd; g.fillRect(0,0,128,128);
+    const sh=new THREE.Mesh(new THREE.PlaneGeometry(6,3.2),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));
+    sh.rotation.x=-Math.PI/2; sh.position.y=0.002; scene.add(sh);
+    controls=new THREE.OrbitControls(camera,renderer.domElement);
+    controls.enableDamping=true; controls.enablePan=false; controls.minDistance=3.2; controls.maxDistance=18;
+    controls.maxPolarAngle=Math.PI*0.48; controls.target.set(0,0.7,0);
+    controls.addEventListener("start",()=>{ camGoal=null; });
+    new ResizeObserver(resize).observe(stage);
+    let down=null;
+    renderer.domElement.addEventListener("pointerdown",e=>{ down=[e.clientX,e.clientY]; });
+    renderer.domElement.addEventListener("pointerup",e=>{ if(down && Math.hypot(e.clientX-down[0],e.clientY-down[1])<8) tap(e); down=null; });
+    return true;
+  }
+  function resize(){ const w=stage.clientWidth,h=stage.clientHeight; if(!w||!h) return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+
+  function mat(c,o){ return new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.6,metalness:.1},o||{})); }
+  function box(w,h,d,m,x,y,z){ const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); b.position.set(x,y,z); return b; }
+  function poly(P,x){ if(x<=P[0][0]) return P[0][1]; for(let i=1;i<P.length;i++){ if(x<=P[i][0]){ const a=P[i-1],b=P[i],t=(x-a[0])/(b[0]-a[0]); return a[1]+(b[1]-a[1])*t; } } return P[P.length-1][1]; }
+  function smooth(a,n){ for(let p=0;p<n;p++){ const o=a.slice(); for(let i=1;i<a.length-1;i++) o[i]=(a[i-1]+2*a[i]+a[i+1])/4; a=o; } return a; }
+
+  /* The body is one smooth shell: ~120 cross-sections along the car, each a rounded
+     rectangle that follows the roof line, narrows above the belt line (tumblehome)
+     and pinches at the nose and tail. Each face is then sorted into paint, glass,
+     black trim, or the hood panel, and wheel arches are cut out. */
+  function shell(c){
+    const F=c.L/2, N=120, M=36, R=2*M-2;
+    const hwAt=x=>{ const s=Math.max(0,(Math.abs(x)-(F-0.75))/0.75); return c.W/2*(1-0.06*s*s-0.12*s*s*s*s); };
+    const beltAt=x=>c.beltY-x*c.beltRise;
+    const xs=[],T0=[],B0=[];
+    for(let i=0;i<N;i++){ const x=-F+2*F*i/(N-1); xs.push(x); T0.push(poly(c.top,x)); B0.push(poly(c.bot,x)); }
+    const T=smooth(T0,4), B=smooth(B0,3);
+    const pos=[], kind=[];
+    for(let i=0;i<N;i++){
+      const x=xs[i], hw=hwAt(x), b=B[i], t=T[i], h=t-b, belt=beltAt(x);
+      const rb=Math.min(0.1,h*0.3), rt=Math.min(c.rt,h*0.35,hw*0.5);
+      const L1=hw-rb, L2=Math.PI/2*rb, L3=Math.max(0,h-rb-rt), L4=Math.PI/2*rt, L5=hw-rt, tot=L1+L2+L3+L4+L5;
+      const half=[];
+      for(let k=0;k<M;k++){
+        let s=tot*k/(M-1), z, y, kd;
+        if(s<L1){ z=s; y=b; kd=0; }
+        else if((s-=L1)<L2){ const a=s/rb; z=hw-rb+rb*Math.sin(a); y=b+rb-rb*Math.cos(a); kd=1; }
+        else if((s-=L2)<L3){ z=hw; y=b+rb+s; kd=2; }
+        else if((s-=L3)<L4){ const a=s/rt; z=hw-rt+rt*Math.cos(a); y=t-rt+rt*Math.sin(a); kd=3; }
+        else { s-=L4; z=Math.max(0,hw-rt-s); y=t; kd=4; }
+        if(y>belt && t>belt) z*=1-c.tumble*Math.min(1,(y-belt)/(t-belt));
+        half.push([z,y,kd]);
+      }
+      const ring=half.concat(half.slice(1,M-1).reverse().map(([z,y,k])=>[-z,y,k]));
+      ring.forEach(([z,y,k])=>{ pos.push(x,y,z); kind.push(k); });
+    }
+    const idx={paint:[],glass:[],black:[],hood:[],side:[],low:[]};
+    const P=i=>[pos[3*i],pos[3*i+1],pos[3*i+2]];
+    const hoodX0=c.cowlX+0.04, hoodX1=F-0.12;
+    for(let i=0;i<N-1;i++) for(let j=0;j<R;j++){
+      const a=i*R+j, b2=(i+1)*R+j, cc=(i+1)*R+(j+1)%R, d=i*R+(j+1)%R;
+      const pa=P(a),pc=P(cc), xc=(pa[0]+pc[0])/2, yc=(pa[1]+pc[1])/2, zc=Math.abs((pa[2]+pc[2])/2);
+      const kf=Math.max(kind[a],kind[d]), hw=hwAt(xc), belt=beltAt(xc), b=B[i];
+      let cut=false;
+      c.axles.forEach(ax=>{ const d2=(xc-ax)**2+(yc-c.r)**2; if(d2<(c.r+0.075)**2 && kf<=2 && zc>0.35*hw) cut=true; });
+      if(cut) continue;
+      let g="paint";
+      if(xc>hoodX0 && xc<hoodX1 && kf>=3) g="hood";
+      else if(kf===0) g="black";
+      else if(kf===4 && xc>c.roofFront+0.03 && xc<c.cowlX-0.03 && yc>belt) g="glass";            // windshield
+      else if(kf===4 && xc>c.rwX && xc<c.roofRear-0.02 && yc>belt+0.03) g="glass";               // rear window
+      const q=[a,b2,cc,a,cc,d];
+      idx[g].push(...q);
+      // overlays cut by straight clipping planes, so their edges stay clean
+      if(kf===2 && yc>belt-0.12 && xc>c.sgX && xc<c.cowlX-0.08 && Math.abs(xc-c.bpillar)>=0.055) idx.side.push(...q);
+      if(c.suv && kf<=2) idx.low.push(...q);
+    }
+    // nose and tail caps
+    [0,N-1].forEach(i=>{ const cy=(T[i]+B[i])/2, ci=pos.length/3; pos.push(xs[i],cy,0);
+      for(let j=0;j<R;j++) idx.paint.push(ci,i*R+j,i*R+(j+1)%R); });
+    const geo=new THREE.BufferGeometry(); geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
+    geo.setIndex([].concat(idx.paint,idx.glass,idx.black,idx.hood)); geo.computeVertexNormals();
+    const mk=(list,m)=>{ const g=new THREE.BufferGeometry(); g.setAttribute("position",geo.attributes.position); g.setAttribute("normal",geo.attributes.normal); g.setIndex(list); return new THREE.Mesh(g,m); };
+    return {mk,idx,hwAt,beltAt,topAt:x=>poly(c.top,x),Tn:T[N-1],Bn:B[N-1],T0:T[0],B0:B[0],F};
+  }
+
+  function wheel(c,side,tireM,rimM,darkM,discM,caliperM){
+    const g=new THREE.Group(), r=c.r, rimR=r*0.66, w=0.11;
+    const prof=[[rimR,-w],[r-0.04,-w],[r-0.008,-w+0.035],[r,0],[r-0.008,w-0.035],[r-0.04,w],[rimR,w]].map(p=>new THREE.Vector2(p[0],p[1]));
+    g.add(new THREE.Mesh(new THREE.LatheGeometry(prof,40),tireM));
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(rimR,rimR,0.2,32,1,true),rimM));
+    const face=new THREE.Mesh(new THREE.CylinderGeometry(rimR*0.97,rimR*0.97,0.01,32),darkM); face.position.y=0.04; g.add(face);
+    const disc=new THREE.Mesh(new THREE.CylinderGeometry(rimR*0.78,rimR*0.78,0.02,28),discM); disc.position.y=0.055; g.add(disc);
+    const cal=box(0.1,0.04,0.16,caliperM,-rimR*0.55,0.075,0); g.add(cal);
+    const n=c.suv?5:10;
+    for(let k=0;k<n;k++){ const sp=box(c.suv?0.05:0.025,0.025,rimR*0.92,rimM,0,0.098,0); const piv=new THREE.Group(); sp.position.z=rimR*0.46; piv.add(sp); piv.rotation.y=k*2*Math.PI/n; g.add(piv); }
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.055,0.03,20),rimM); hub.position.y=0.1; g.add(hub);
+    g.rotation.x = side>0 ? Math.PI/2 : -Math.PI/2;
+    return g;
+  }
+
+  /* The uploaded Ateca model (front along +z): turned to face +x, its body split so the
+     hood becomes its own panel hinged at the windshield base. */
+  function addGlb(G,c,paint,px,py){
+    const root=c.glb.clone(true); root.rotation.y=Math.PI/2;
+    let body=null;
+    root.traverse(o=>{ if(o.isMesh){ o.material=o.material.clone(); o.material.side=THREE.DoubleSide;
+      if(/Body/i.test(o.name)){ o.material=paint; body=o; }
+      else if(/Glass/i.test(o.name)){ o.material.envMapIntensity=0.6; }
+      else if(/Head/i.test(o.name)){ o.material.emissive=new THREE.Color(0xdfe6ff); o.material.emissiveIntensity=0.7; }
+      else if(/Tail/i.test(o.name)){ o.material.emissive=new THREE.Color(0x8a0812); o.material.emissiveIntensity=0.8; }
+      else if(/Chrome|Alloy/i.test(o.name)){ o.material.metalness=0.9; o.material.roughness=0.25; } } });
+    G.add(root);
+    hoodPivot=new THREE.Group(); hoodPivot.position.set(px,py,0); G.add(hoodPivot);
+    hoodMesh=null;
+    if(body){
+      const g=body.geometry, p=g.attributes.position, ix=g.index?Array.from(g.index.array):[...Array(p.count).keys()];
+      const keep=[], hood=[], A=new THREE.Vector3(), B=new THREE.Vector3(), C=new THREE.Vector3(), n=new THREE.Vector3();
+      for(let t=0;t<ix.length;t+=3){
+        A.fromBufferAttribute(p,ix[t]); B.fromBufferAttribute(p,ix[t+1]); C.fromBufferAttribute(p,ix[t+2]);
+        const cz=(A.z+B.z+C.z)/3, cy=(A.y+B.y+C.y)/3;
+        n.subVectors(B,A).cross(new THREE.Vector3().subVectors(C,A)).normalize();
+        (cz>1.0 && cz<2.13 && cy>0.76 && Math.abs(n.y)>0.8 ? hood : keep).push(ix[t],ix[t+1],ix[t+2]);
+      }
+      const mk=list=>{ const q=new THREE.BufferGeometry(); for(const k in g.attributes) q.setAttribute(k,g.attributes[k]); q.setIndex(list); q.computeVertexNormals(); return q; };
+      body.geometry=mk(keep);
+      const holder=new THREE.Group(); holder.rotation.y=Math.PI/2; holder.position.set(-px,-py,0);
+      hoodMesh=new THREE.Mesh(mk(hood),paint); hoodMesh.userData.hood=true; holder.add(hoodMesh); hoodPivot.add(holder);
+    }
+  }
+
+  function build(c){
+    const G=new THREE.Group(), sh=shell(c), F=sh.F, W=c.W;
+    const paint=new THREE.MeshPhysicalMaterial({color:c.color,metalness:c.metal,roughness:0.32,clearcoat:1,clearcoatRoughness:0.06,envMapIntensity:c.metal>0.3?0.75:1,side:THREE.DoubleSide});
+    const glass=new THREE.MeshPhysicalMaterial({color:0x06080c,metalness:0,roughness:0.05,clearcoat:0.6,envMapIntensity:0.45,side:THREE.DoubleSide});
+    const black=new THREE.MeshStandardMaterial({color:0x17191d,roughness:0.75,side:THREE.DoubleSide});
+    const chrome=mat(0xd9dde3,{metalness:1,roughness:0.18});
+    const px=c.glb?1.0:c.cowlX+0.04, py=c.glb?0.985:sh.topAt(px), wy=c.glb?1.0:sh.topAt(c.cowlX-0.06)+0.02, cb=c.glb?0.5:c.bay;
+    if(c.glb){ addGlb(G,c,paint,px,py); }
+    else {
+    const over=o=>Object.assign(o,{polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-4});
+    const rise=c.beltRise, n=Math.hypot(rise,1);
+    const sideGlass=over(glass.clone()); sideGlass.clippingPlanes=[new THREE.Plane(new THREE.Vector3(rise/n,1/n,0),-(c.beltY+0.02)/n)];
+    G.add(sh.mk(sh.idx.paint,paint), sh.mk(sh.idx.glass,glass), sh.mk(sh.idx.black,black), sh.mk(sh.idx.side,sideGlass));
+    if(c.suv){ const clad=over(black.clone()); clad.clippingPlanes=[new THREE.Plane(new THREE.Vector3(0,-1,0),0.54)]; G.add(sh.mk(sh.idx.low,clad)); }
+    // wheel-arch lips hide the cut edge
+    c.axles.forEach(ax=>[1,-1].forEach(s=>{
+      const lip=new THREE.Mesh(new THREE.TorusGeometry(c.r+0.08,c.suv?0.055:0.03,10,36,Math.PI),c.suv?black:paint);
+      lip.position.set(ax,c.r,s*(sh.hwAt(ax)-(c.suv?0.01:0.02))); lip.scale.z=c.suv?0.6:0.8; G.add(lip);
+    }));
+    // hood: same shell faces, hinged at the cowl
+    hoodPivot=new THREE.Group(); hoodPivot.position.set(px,py,0);
+    hoodMesh=sh.mk(sh.idx.hood,paint); hoodMesh.position.set(-px,-py,0); hoodMesh.userData.hood=true;
+    hoodPivot.add(hoodMesh); G.add(hoodPivot);
+    // wheel wells
+    c.axles.forEach(ax=>[1,-1].forEach(s=>{
+      const well=new THREE.Mesh(new THREE.CylinderGeometry(c.r+0.07,c.r+0.07,0.34,24,1,true,Math.PI/2,Math.PI),mat(0x0c0d10,{side:THREE.DoubleSide,roughness:1}));
+      well.rotation.x=Math.PI/2; well.position.set(ax,c.r,s*(sh.hwAt(ax)-0.16)); G.add(well);
+    }));
+    // lights, grille, intakes
+    const head=mat(0xf6f8ff,{emissive:0xe6ecff,emissiveIntensity:0.9,metalness:0.3,roughness:0.15});
+    const drl=mat(0xffffff,{emissive:0xffffff,emissiveIntensity:1.4});
+    const tail=mat(0xa3101a,{emissive:0x8a0812,emissiveIntensity:0.9,roughness:0.2});
+    const hwN=sh.hwAt(F), hwT=sh.hwAt(-F);
+    [1,-1].forEach(s=>{
+      const hl=box(0.05,0.09,0.36,head,F-0.005,sh.Tn-0.1,s*hwN*0.6); hl.rotation.x=s*0.08; G.add(hl);
+      G.add(box(0.052,0.015,0.34,drl,F,sh.Tn-0.155,s*hwN*0.6));
+      G.add(box(0.05,0.08,0.4,tail,-F+0.005,sh.T0-0.14,s*hwT*0.62));
+      G.add(box(0.05,0.03,0.12,tail,-F+0.005,sh.B0+0.1,s*hwT*0.78));
+    });
+    G.add(box(0.05,0.2,hwN*1.0,black,F,(sh.Tn+sh.Bn)/2-0.03,0));
+    G.add(box(0.05,0.08,hwN*1.35,black,F-0.005,sh.Bn+0.09,0));
+    G.add(box(0.05,0.12,0.5,mat(0x22252b),-F+0.002,(sh.T0+sh.B0)/2-0.04,0)); // plate recess
+    // mirrors, door seams, handles
+    [1,-1].forEach(s=>{
+      const mx=c.cowlX-0.12, mz=sh.hwAt(mx)*(1-c.tumble*0.15)+0.07, my=sh.beltAt(mx)+0.09;
+      G.add(box(0.15,0.11,0.14,paint,mx,my,s*mz));
+      G.add(box(0.06,0.03,0.08,black,mx+0.02,my-0.06,s*(mz-0.06)));
+      const seamX=[c.cowlX-0.06, c.bpillar, c.axles[1]+c.r+0.16];
+      seamX.forEach(x=>{ const yb=poly(c.bot,x)+0.12, yt=sh.beltAt(x)-0.01; G.add(box(0.006,yt-yb,0.004,black,x,(yb+yt)/2,s*(sh.hwAt(x)+0.002))); });
+      [c.bpillar+0.14, seamX[2]+0.14].forEach(x=>G.add(box(0.14,0.025,0.02,c.suv?black:chrome,x,sh.beltAt(x)-0.08,s*(sh.hwAt(x)+0.008))));
+      if(c.suv){ const rx0=c.roofRear+0.15, rx1=c.roofFront-0.2, rl=rx1-rx0; G.add(box(rl,0.03,0.035,chrome,rx0+rl/2,poly(c.top,(rx0+rx1)/2)+0.03,s*(c.W/2*(1-c.tumble)-0.1))); }
+    });
+    // wipers
+    [0.3,-0.32].forEach(z=>{ const w=box(0.025,0.02,0.62,black,c.cowlX-0.06,wy,z); w.rotation.y=0.14; G.add(w); });
+    // wheels
+    const tireM=mat(0x121316,{roughness:0.92}), rimM=mat(0xc9ced6,{metalness:0.9,roughness:0.25}), darkM=mat(0x1a1c20,{roughness:0.7});
+    const discM=mat(0x8a8d93,{metalness:0.8,roughness:0.4}), calM=mat(0x3a3d44,{roughness:0.5});
+    c.axles.forEach(x=>[1,-1].forEach(s=>{ const wh=wheel(c,s,tireM,rimM,darkM,discM,calM); wh.position.set(x,c.r,s*(sh.hwAt(x)-0.1)); G.add(wh); }));
+    }
+    // engine bay
+    const fl=cb+0.02, x1=F-0.12, mid=(px+x1)/2-0.05, Tpx=c.glb?0.95:sh.topAt(px);
+    const hwB=sh.hwAt(px+0.3)*(c.glb?0.82:0.9), hwF=sh.hwAt(F-0.35)*(c.glb?0.8:0.9);
+    G.add(box(x1-px,0.02,sh.hwAt(mid)*(c.glb?1.6:1.9),mat(0x2c3036),(px+x1)/2,cb,0));
+    G.add(box(0.04,Tpx-cb,sh.hwAt(px)*(c.glb?1.6:1.85),mat(0x1c1f24),px-0.01,(cb+Tpx)/2,0));
+    const metal=mat(0x737a84,{metalness:0.7,roughness:0.4}), cover=mat(0x24272d,{roughness:0.45});
+    G.add(box(0.5,0.26,0.7,metal,mid,fl+0.13,0.03));
+    G.add(box(0.46,0.04,0.6,cover,mid,fl+0.28,0.03));
+    for(let i=0;i<4;i++) G.add(box(0.05,0.035,0.05,mat(0x9a1f1f),mid-0.08,fl+0.315,-0.22+i*0.15));
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.035,16),mat(0xf1c21b)); cap.position.set(mid+0.12,fl+0.31,0.22); G.add(cap);
+    G.add(box(0.36,0.22,0.03,black,mid,fl+0.12,0.40));
+    G.add(box(0.24,0.19,0.17,mat(0x1b1d22),px+0.3,fl+0.095,-(hwB-0.3)));
+    G.add(box(0.05,0.03,0.04,mat(0xb3271f),px+0.36,fl+0.2,-(hwB-0.3)+0.05));
+    const cool=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.18,16),mat(0xf0b7c8,{transparent:true,opacity:.85})); cool.position.set(px+0.3,fl+0.09,hwB-0.3); G.add(cool);
+    const bf=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.12,14),mat(0xe8d690,{transparent:true,opacity:.9})); bf.position.set(px+0.14,fl+0.1,-(hwB-0.58)); G.add(bf);
+    G.add(box(0.26,0.14,0.28,black,F-0.35,fl+0.07,hwF-0.32));
+    // hotspots
+    spots=[]; const S_=(part,x,y,z,bay)=>spots.push({part,pos:new THREE.Vector3(x,y,z),bay});
+    S_("oil",mid+0.12,fl+0.4,0.22,1);
+    S_("sparkplugs",mid-0.08,fl+0.4,-0.1,1);
+    S_("timingbelt",mid,fl+0.25,0.43,1);
+    S_("battery",px+0.3,fl+0.26,-(hwB-0.3),1);
+    S_("coolant",px+0.3,fl+0.25,hwB-0.3,1);
+    S_("brakefluid",px+0.14,fl+0.23,-(hwB-0.58),1);
+    S_("airfilter",F-0.35,fl+0.2,hwF-0.32,1);
+    S_("cabinfilter",px+0.02,Tpx+0.02,0.05,1);
+    S_("wipers",c.cowlX-0.08,wy+0.05,0.3,0);
+    S_("tires",c.axles[0],c.r*1.95,sh.hwAt(c.axles[0])-0.06,0);
+    S_("brakepads",c.axles[1],c.r,sh.hwAt(c.axles[1])+0.05,0);
+    spots.forEach(s=>{ s.mesh=new THREE.Mesh(new THREE.SphereGeometry(0.045,16,12),new THREE.MeshBasicMaterial({color:0x888888,toneMapped:false})); s.mesh.position.copy(s.pos); s.mesh.userData.part=s.part; G.add(s.mesh); });
+    c._hoodTagY=(c.glb?0.92:sh.topAt((px+x1)/2))+0.05; c._hoodTagX=(px+x1)/2;
+    return G;
+  }
+
+  function makeTags(){
+    labels.innerHTML=""; tags=[];
+    spots.forEach(s=>{ const b=document.createElement("button"); b.className="tag"; b.innerHTML=`<i></i>${PART[s.part].name}`;
+      b.onclick=()=>openSheet(s.part); labels.appendChild(b); s.tag=b; });
+    hoodTag=document.createElement("button"); hoodTag.className="tag hood"; hoodTag.textContent="Open hood"; hoodTag.onclick=toggleHood; labels.appendChild(hoodTag);
+  }
+  function refreshStatus(){
+    if(!spec) return;
+    spots.forEach(s=>{ const st=statusOf(spec.id,s.part).s, col=tok("--"+st);
+      if(s.mesh) s.mesh.material.color.set(col); if(s.tag) s.tag.querySelector("i").style.background=col; });
+  }
+  // camera distance that keeps the whole car in frame on narrow phone screens
+  function view(open){
+    const v=THREE.MathUtils.degToRad(camera.fov)/2, hf=Math.atan(Math.tan(v)*camera.aspect);
+    const d=Math.max(7.2, 2.45/Math.tan(hf));
+    const t=open?new THREE.Vector3(1.2,0.8,0):new THREE.Vector3(0,0.7,0);
+    const dir=open?new THREE.Vector3(2.2,2.6,1.5):new THREE.Vector3(5.0,2.1,5.2);
+    return {p:t.clone().add(dir.normalize().multiplyScalar(open?Math.max(4.2,d*0.62):d)), t};
+  }
+  function toggleHood(){
+    hoodTarget = hoodTarget?0:1;
+    $("hoodbtn").textContent = hoodTarget?"Close hood":"Open hood";
+    $("hint").textContent = hoodTarget?"Tap a part to log a replacement":"Tap the hood to open it · drag to turn";
+    camGoal = hoodTarget ? view(true) : view(false);
+  }
+  $("hoodbtn").addEventListener("click",()=>{ if(spec) toggleHood(); });
+  function tap(e){
+    const r=renderer.domElement.getBoundingClientRect();
+    const m=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+    const ray=new THREE.Raycaster(); ray.setFromCamera(m,camera);
+    const hits=ray.intersectObjects(car.children.concat(hoodPivot.children),true);
+    for(const h of hits){ if(!h.object.visible) continue;
+      if(h.object.userData.part){ openSheet(h.object.userData.part); return; }
+      if(h.object.userData.hood){ toggleHood(); return; }
+      if(hoodAngle<0.1){ // closed: tapping near hood region counts
+        if(h.point.x>spec.cowl[0]-0.05 && h.point.y>spec.bay) { toggleHood(); return; }
+      }
+      return; }
+  }
+  const v=new THREE.Vector3();
+  function frame(t){
+    raf=requestAnimationFrame(frame);
+    hoodAngle += (hoodTarget*1.05 - hoodAngle)*0.12;
+    hoodPivot.rotation.z = hoodAngle;
+    if(camGoal){ camera.position.lerp(camGoal.p,0.08); controls.target.lerp(camGoal.t,0.08); if(camera.position.distanceTo(camGoal.p)<0.02) camGoal=null; }
+    controls.update();
+    renderer.render(scene,camera);
+    const w=stage.clientWidth,h=stage.clientHeight, open=hoodAngle>0.6, pulse=1+0.25*Math.sin(t/300);
+    spots.forEach(s=>{ const show = s.bay?open:true; s.mesh.visible=show; s.mesh.scale.setScalar(pulse);
+      if(!show){ s.tag.hidden=true; return; }
+      v.copy(s.pos).project(camera); const vis=v.z<1 && Math.abs(v.x)<1.05 && Math.abs(v.y)<1.05;
+      s.tag.hidden=!vis; if(vis) s.tag.style.transform=`translate(${(v.x+1)/2*w}px,${(1-v.y)/2*h}px) translate(-50%,-130%)`; });
+    if(hoodTag){ hoodTag.hidden = hoodTarget===1 || hoodAngle>0.05;
+      if(!hoodTag.hidden){ v.set(spec._hoodTagX,spec._hoodTagY,0).project(camera); hoodTag.style.transform=`translate(${(v.x+1)/2*w}px,${(1-v.y)/2*h}px) translate(-50%,-50%)`; } }
+    declutter();
+  }
+  // hide labels that overlap an earlier one (keeps the phone view readable)
+  let dc=0;
+  function declutter(){
+    if(++dc%6) return;
+    const placed=[];
+    spots.forEach(s=>{ if(s.tag.hidden){ s.tag.style.visibility=""; return; }
+      const r=s.tag.getBoundingClientRect(); const hit=placed.some(p=>!(r.right<p.left||r.left>p.right||r.bottom<p.top||r.top>p.bottom));
+      s.tag.style.visibility=hit?"hidden":""; if(!hit) placed.push(r); });
+  }
+  function load(c){
+    if(!init()) return;
+    spec=c; if(car){ scene.remove(car); car.traverse(o=>{ o.geometry&&o.geometry.dispose(); }); }
+    hoodTarget=0; hoodAngle=0; $("hoodbtn").textContent="Open hood"; $("hint").textContent="Tap the hood to open it · drag to turn";
+    car=build(c); scene.add(car); makeTags(); refreshStatus();
+    resize(); const h=view(false); camera.position.copy(h.p); controls.target.copy(h.t); camGoal=null;
+    if(!raf) raf=requestAnimationFrame(frame);
+  }
+  function stop(){ if(raf){ cancelAnimationFrame(raf); raf=null; } }
+  // picker pictures: render each 3D car once to an image
+  const thumbs={};
+  function thumb(c){
+    if(thumbs[c.id]!==undefined) return thumbs[c.id];
+    thumbs[c.id]=null;
+    try{
+      if(!init()) return null;
+      const saved={spots,hoodPivot,hoodMesh}, camP=camera.position.clone(), camT=controls.target.clone(), asp=camera.aspect;
+      const G=build(c); spots.forEach(s=>s.mesh.visible=false);
+      if(car) car.visible=false; scene.add(G);
+      renderer.setSize(720,400,false); camera.aspect=720/400; camera.updateProjectionMatrix();
+      camera.position.set(4.3,1.75,5.3).normalize().multiplyScalar(6.4).add(new THREE.Vector3(0,0.62,0)); camera.lookAt(0,0.62,0);
+      renderer.render(scene,camera); thumbs[c.id]=renderer.domElement.toDataURL("image/png");
+      scene.remove(G); G.traverse(o=>{ o.geometry&&o.geometry.dispose(); });
+      if(car) car.visible=true; spots=saved.spots; hoodPivot=saved.hoodPivot; hoodMesh=saved.hoodMesh;
+      camera.aspect=asp; camera.position.copy(camP); controls.target.copy(camT); camera.lookAt(camT); camera.updateProjectionMatrix(); resize();
+    }catch(e){ thumbs[c.id]=null; }
+    return thumbs[c.id];
+  }
+  return {load,stop,refreshStatus,thumb,resetThumb:id=>{ delete thumbs[id]; }};
+})();
+
+/* the uploaded Ateca model, embedded so the page needs no outside files */
+function loadAtecaModel(){
+  try{
+    const el=document.getElementById("ateca-glb"); if(!el || !window.THREE || !THREE.GLTFLoader) return;
+    const bin=atob(el.textContent.trim()), buf=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i);
+    new THREE.GLTFLoader().parse(buf.buffer,"",g=>{
+      CARS.ateca.glb=g.scene; Viewer.resetThumb("ateca"); renderPicker();
+      if(current && current.id==="ateca") Viewer.load(current);
+    },()=>{});
+  }catch(e){}
+}
+
+/* boot */
+route(); renderAll(); initStore();
+</script>
+
+</body>
+</html>
