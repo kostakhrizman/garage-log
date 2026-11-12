@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
 <style>
-/* Layout: one-column phone app. Picker -> car view (3D bay on top, service table below), bottom sheet per part. */
+/* Layout: one-column phone app. Picker -> car view (3D bay on top, service table below), part panel opens under the car. */
 :root{
   --bg:#eef1f6; --surface:#ffffff; --ink:#141a26; --muted:#5d6779; --line:#d6dce7;
   --accent:#1f3a78; --accent-ink:#ffffff; --stage:#dfe5ef;
@@ -98,11 +98,10 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
   .row .c-next::before{content:"Next: ";color:var(--muted)}
 }
 
-/* sheet */
-.scrim{position:fixed;inset:0;background:rgba(5,10,20,.45);z-index:20}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-height:88vh;overflow:auto;background:var(--surface);border-radius:20px 20px 0 0;
-  padding:18px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
-  display:flex;flex-direction:column;gap:16px;max-width:720px;margin:0 auto;box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+/* part panel: opens in place, right under the car */
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin:0 0 12px;
+  display:flex;flex-direction:column;gap:16px;scroll-margin-top:12px}
+.sheet[hidden]{display:none}
 .sheet .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .x{border:1px solid var(--line);background:none;border-radius:10px;width:36px;height:36px;flex:none}
 .box{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
@@ -152,12 +151,11 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
       <div class="hint"><span id="hint">Tap the hood to open it · drag to turn</span></div>
     </div>
     <p class="credit" id="credit" hidden>3D model: <a href="https://sketchfab.com/3d-models/2020-seat-ateca-5fp-b893275" target="_blank" rel="noopener">2020 Seat Ateca (5FP)</a> by BloxBloger, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+    <div class="sheet" id="sheet" hidden role="region" aria-labelledby="sh-title"></div>
     <div class="table" id="table"></div>
   </section>
 </div>
 
-<div class="scrim" id="scrim" hidden></div>
-<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sh-title"></div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -351,9 +349,11 @@ window.addEventListener("hashchange",route);
 
 /* ---------- part sheet ---------- */
 let openPart=null, armedDel=null;
-function openSheet(pid){ openPart=pid; armedDel=null; renderSheet(true); $("scrim").hidden=false; $("sheet").hidden=false; }
-function closeSheet(){ openPart=null; $("scrim").hidden=true; $("sheet").hidden=true; }
-$("scrim").addEventListener("click",closeSheet);
+function openSheet(pid){ openPart=pid; armedDel=null; renderSheet(true); $("sheet").hidden=false;
+  // bring the panel up into the lower part of the screen, keeping the car in view above it
+  requestAnimationFrame(()=>{ const top=$("sheet").getBoundingClientRect().top, want=innerHeight*0.42;
+    if(top>want) scrollBy({top:top-want,behavior:"smooth"}); }); }
+function closeSheet(){ openPart=null; $("sheet").hidden=true; }
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
 function renderSheet(fresh){
   if(!current||!openPart) return;
