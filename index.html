@@ -78,6 +78,8 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
 .hint{position:absolute;left:12px;bottom:10px;right:12px;font-size:12.5px;color:var(--muted);pointer-events:none;display:flex;justify-content:space-between;gap:8px}
 .hoodbtn{position:absolute;right:max(10px,env(safe-area-inset-right,0px));top:10px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 12px;font-weight:600;font-size:13px}
 
+.credit{margin:-6px 4px 10px;font-size:11px;color:var(--muted)}
+.credit a{color:inherit}
 .table{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
 .thead,.row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.1fr) auto;gap:10px;align-items:center;padding:11px 14px}
 .thead{font-family:var(--f-display);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
@@ -149,6 +151,7 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
       <button class="hoodbtn" id="hoodbtn">Open hood</button>
       <div class="hint"><span id="hint">Tap the hood to open it · drag to turn</span></div>
     </div>
+    <p class="credit" id="credit" hidden>3D model: <a href="https://sketchfab.com/3d-models/2020-seat-ateca-5fp-b893275" target="_blank" rel="noopener">2020 Seat Ateca (5FP)</a> by BloxBloger, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
     <div class="table" id="table"></div>
   </section>
 </div>
@@ -159,6 +162,8 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
 <script>
 "use strict";
 /* ---------- static data ---------- */
@@ -333,6 +338,7 @@ function showCar(id){
   current=CARS[id]; $("picker").hidden=true; $("carview").hidden=false;
   $("cv-name").textContent=current.name; $("cv-year").textContent=current.year;
   $("odo").value=currentKm(id)||""; renderTable(); Viewer.load(current); window.scrollTo(0,0);
+  $("credit").hidden = !current.glb;
 }
 $("cars").addEventListener("click",e=>{ const b=e.target.closest("[data-car]"); if(b) location.hash=b.dataset.car; });
 $("back").addEventListener("click",()=>{ location.hash=""; history.replaceState(null,"",location.pathname+location.search); route(); });
@@ -534,34 +540,23 @@ const Viewer = (()=>{
     return g;
   }
 
-  /* The uploaded Ateca model (front along +z): turned to face +x, its body split so the
-     hood becomes its own panel hinged at the windshield base. */
+  /* The real Ateca model (front along +z, 1 unit = 1.71/4.36 m): scaled to metres, turned to
+     face +x, painted navy. Its separate hood panel (body_12) is moved onto the hinge. */
   function addGlb(G,c,paint,px,py){
-    const root=c.glb.clone(true); root.rotation.y=Math.PI/2;
-    let body=null;
-    root.traverse(o=>{ if(o.isMesh){ o.material=o.material.clone(); o.material.side=THREE.DoubleSide;
-      if(/Body/i.test(o.name)){ o.material=paint; body=o; }
-      else if(/Glass/i.test(o.name)){ o.material.envMapIntensity=0.6; }
-      else if(/Head/i.test(o.name)){ o.material.emissive=new THREE.Color(0xdfe6ff); o.material.emissiveIntensity=0.7; }
-      else if(/Tail/i.test(o.name)){ o.material.emissive=new THREE.Color(0x8a0812); o.material.emissiveIntensity=0.8; }
-      else if(/Chrome|Alloy/i.test(o.name)){ o.material.metalness=0.9; o.material.roughness=0.25; } } });
-    G.add(root);
+    const root=new THREE.Group(), inner=c.glb.clone(true);
+    root.scale.setScalar(2.55); root.rotation.y=Math.PI/2; inner.position.x=-0.035; root.add(inner); G.add(root);
+    let hood=null;
+    inner.traverse(o=>{
+      if(!hood && /body_12/i.test(o.name)) hood=o;
+      if(!o.isMesh) return;
+      const n=(o.material.name||"").toLowerCase();
+      if(n==="body") o.material=paint;
+      else if(/glass/.test(n) && n!=="r_glass"){ o.material=o.material.clone(); o.material.color.set(0x0b0f16); o.material.opacity=0.82; o.material.roughness=0.05; }
+      if(/black_matt_45/i.test(o.name)) o.visible=false;
+    });
     hoodPivot=new THREE.Group(); hoodPivot.position.set(px,py,0); G.add(hoodPivot);
-    hoodMesh=null;
-    if(body){
-      const g=body.geometry, p=g.attributes.position, ix=g.index?Array.from(g.index.array):[...Array(p.count).keys()];
-      const keep=[], hood=[], A=new THREE.Vector3(), B=new THREE.Vector3(), C=new THREE.Vector3(), n=new THREE.Vector3();
-      for(let t=0;t<ix.length;t+=3){
-        A.fromBufferAttribute(p,ix[t]); B.fromBufferAttribute(p,ix[t+1]); C.fromBufferAttribute(p,ix[t+2]);
-        const cz=(A.z+B.z+C.z)/3, cy=(A.y+B.y+C.y)/3;
-        n.subVectors(B,A).cross(new THREE.Vector3().subVectors(C,A)).normalize();
-        (cz>1.0 && cz<2.13 && cy>0.76 && Math.abs(n.y)>0.8 ? hood : keep).push(ix[t],ix[t+1],ix[t+2]);
-      }
-      const mk=list=>{ const q=new THREE.BufferGeometry(); for(const k in g.attributes) q.setAttribute(k,g.attributes[k]); q.setIndex(list); q.computeVertexNormals(); return q; };
-      body.geometry=mk(keep);
-      const holder=new THREE.Group(); holder.rotation.y=Math.PI/2; holder.position.set(-px,-py,0);
-      hoodMesh=new THREE.Mesh(mk(hood),paint); hoodMesh.userData.hood=true; holder.add(hoodMesh); hoodPivot.add(holder);
-    }
+    hoodMesh=hood;
+    if(hood){ G.updateMatrixWorld(true); hoodPivot.attach(hood); hood.traverse(o=>{ if(o.isMesh){ o.userData.hood=true; o.material=paint; } }); }
   }
 
   function build(c){
@@ -570,7 +565,7 @@ const Viewer = (()=>{
     const glass=new THREE.MeshPhysicalMaterial({color:0x06080c,metalness:0,roughness:0.05,clearcoat:0.6,envMapIntensity:0.45,side:THREE.DoubleSide});
     const black=new THREE.MeshStandardMaterial({color:0x17191d,roughness:0.75,side:THREE.DoubleSide});
     const chrome=mat(0xd9dde3,{metalness:1,roughness:0.18});
-    const px=c.glb?1.0:c.cowlX+0.04, py=c.glb?0.985:sh.topAt(px), wy=c.glb?1.0:sh.topAt(c.cowlX-0.06)+0.02, cb=c.glb?0.5:c.bay;
+    const px=c.glb?1.02:c.cowlX+0.04, py=c.glb?1.10:sh.topAt(px), wy=c.glb?1.08:sh.topAt(c.cowlX-0.06)+0.02, cb=c.glb?0.55:c.bay;
     if(c.glb){ addGlb(G,c,paint,px,py); }
     else {
     const over=o=>Object.assign(o,{polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-4});
@@ -626,7 +621,7 @@ const Viewer = (()=>{
     c.axles.forEach(x=>[1,-1].forEach(s=>{ const wh=wheel(c,s,tireM,rimM,darkM,discM,calM); wh.position.set(x,c.r,s*(sh.hwAt(x)-0.1)); G.add(wh); }));
     }
     // engine bay
-    const fl=cb+0.02, x1=F-0.12, mid=(px+x1)/2-0.05, Tpx=c.glb?0.95:sh.topAt(px);
+    const fl=cb+0.02, x1=F-0.12, mid=(px+x1)/2-0.05, Tpx=c.glb?1.06:sh.topAt(px);
     const hwB=sh.hwAt(px+0.3)*(c.glb?0.82:0.9), hwF=sh.hwAt(F-0.35)*(c.glb?0.8:0.9);
     G.add(box(x1-px,0.02,sh.hwAt(mid)*(c.glb?1.6:1.9),mat(0x2c3036),(px+x1)/2,cb,0));
     G.add(box(0.04,Tpx-cb,sh.hwAt(px)*(c.glb?1.6:1.85),mat(0x1c1f24),px-0.01,(cb+Tpx)/2,0));
@@ -655,7 +650,7 @@ const Viewer = (()=>{
     S_("tires",c.axles[0],c.r*1.95,sh.hwAt(c.axles[0])-0.06,0);
     S_("brakepads",c.axles[1],c.r,sh.hwAt(c.axles[1])+0.05,0);
     spots.forEach(s=>{ s.mesh=new THREE.Mesh(new THREE.SphereGeometry(0.045,16,12),new THREE.MeshBasicMaterial({color:0x888888,toneMapped:false})); s.mesh.position.copy(s.pos); s.mesh.userData.part=s.part; G.add(s.mesh); });
-    c._hoodTagY=(c.glb?0.92:sh.topAt((px+x1)/2))+0.05; c._hoodTagX=(px+x1)/2;
+    c._hoodTagY=(c.glb?1.02:sh.topAt((px+x1)/2))+0.05; c._hoodTagX=(px+x1)/2;
     return G;
   }
 
@@ -755,21 +750,19 @@ const Viewer = (()=>{
   return {load,stop,refreshStatus,thumb,resetThumb:id=>{ delete thumbs[id]; }};
 })();
 
-/* the uploaded Ateca model, embedded so the page needs no outside files */
+/* the real Ateca model, loaded next to the page; the drawn model shows until it arrives */
 function loadAtecaModel(){
   try{
-    const el=document.getElementById("ateca-glb"); if(!el || !window.THREE || !THREE.GLTFLoader) return;
-    const bin=atob(el.textContent.trim()), buf=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i);
-    new THREE.GLTFLoader().parse(buf.buffer,"",g=>{
+    if(!window.THREE || !THREE.GLTFLoader || !window.MeshoptDecoder) return;
+    new THREE.GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load("ateca.glb",g=>{
       CARS.ateca.glb=g.scene; Viewer.resetThumb("ateca"); renderPicker();
-      if(current && current.id==="ateca") Viewer.load(current);
-    },()=>{});
+      if(current && current.id==="ateca"){ Viewer.load(current); $("credit").hidden=false; }
+    },undefined,()=>{});
   }catch(e){}
 }
 
 /* boot */
-route(); renderAll(); initStore();
+route(); renderAll(); initStore(); loadAtecaModel();
 </script>
 
 </body>
