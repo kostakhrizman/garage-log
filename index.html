@@ -48,13 +48,13 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
 .banner{font-size:13px;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:8px 12px}
 
 /* picker */
-.cars{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.cars{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .car-card{display:flex;flex-direction:column;gap:10px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;transition:transform .15s}
 .car-card:active{transform:scale(.985)}
 .car-card svg,.car-card .carpic{width:100%;height:auto;max-width:100%;display:block}
 .car-card .carpic{aspect-ratio:720/400;background:radial-gradient(90% 70% at 50% 75%,var(--stage),transparent);border-radius:12px}
 .car-card .meta{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
-.car-card .yr{color:var(--muted);font-size:14px}
+@media (max-width:520px){.cars{gap:8px}.car-card{padding:10px;gap:8px}.car-card h2{font-size:19px}.car-card .meta .num{font-size:13px}}
 .pills{display:flex;gap:6px;flex-wrap:wrap}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
 .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
@@ -150,7 +150,7 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
       <button class="hoodbtn" id="hoodbtn">Open hood</button>
       <div class="hint"><span id="hint">Tap the hood to open it · drag to turn</span></div>
     </div>
-    <p class="credit" id="credit" hidden>3D model: <a href="https://sketchfab.com/3d-models/2020-seat-ateca-5fp-b893275" target="_blank" rel="noopener">2020 Seat Ateca (5FP)</a> by BloxBloger, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a></p>
+    <p class="credit" id="credit" hidden></p>
     <div class="sheet" id="sheet" hidden role="region" aria-labelledby="sh-title"></div>
     <div class="table" id="table"></div>
   </section>
@@ -187,7 +187,10 @@ const PARTS = [
 const PART = Object.fromEntries(PARTS.map(p=>[p.id,p]));
 
 const CARS = {
-  ateca:{id:"ateca",name:"SEAT Ateca",year:"2017 · Navy blue",color:"#0b1736",metal:0.45,
+  ateca:{model:{file:"ateca.glb",scale:2.55,shift:[-0.035,0,0],paint:/^body$/,hood:/body_12/,hide:/black_matt_45/,
+      bay:{px:1.02,py:1.10,wy:1.08,cb:0.55,top:1.06,tag:1.02},
+      credit:`<a href="https://sketchfab.com/3d-models/2020-seat-ateca-5fp-b893275" target="_blank" rel="noopener">2020 Seat Ateca (5FP)</a> by BloxBloger, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>`},
+    id:"ateca",name:"SEAT Ateca",year:"2017 · Navy blue",color:"#0b1736",metal:0.45,
     L:4.36,W:1.84,r:0.355,axles:[1.31,-1.33],cowlX:0.95,bay:0.62,beltY:1.14,beltRise:0.02,tumble:0.16,rt:0.16,suv:true,
     roofRear:-1.80,roofFront:0.12,rwX:-2.15,sgX:-1.86,hlY:[0.76,0.90],tlY:[0.86,1.06],
     top:[[-2.18,0.95],[-2.16,1.20],[-2.02,1.50],[-1.80,1.60],[-0.60,1.635],[0.12,1.60],[0.50,1.37],[0.95,1.09],[1.50,1.05],[1.95,0.98],[2.12,0.90],[2.18,0.76]],
@@ -195,7 +198,12 @@ const CARS = {
     cowl:[0.92,1.08],
     body:[[-2.15,0.32],[-2.18,0.92],[-2.16,1.18],[-1.98,1.60],[0.10,1.63],[0.92,1.08],[0.92,0.84],[2.14,0.84],[2.18,0.70],[2.16,0.32]],
     glass:[[0.80,1.205],[0.174,1.625],[-2.03,1.62],[-2.196,1.20],[-2.0,1.16],[0.80,1.16]], bpillar:-0.55},
-  ibiza:{id:"ibiza",name:"SEAT Ibiza",year:"2016 · White",color:"#e4e6ea",metal:0.05,
+  ibiza:{model:{file:"ibiza.glb",scale:1,shift:[0,0,-0.18],paint:/^am5eunew1$/,hood:/^fmibiza_hood$/,
+      wheel:/^fmibiza_(tires|wheels)$/,axles:[1.41,-1.06],track:0.68,wheelY:0.30,plate:{front:[0.51,2.262],rear:[0.60,-1.792]},
+      mats:{tire_01a:[0x141518,0.9,0],am5eunew1_grey:[0xc3c8cf,0.28,0.9]},
+      bay:{px:0.99,py:1.02,wy:1.0,cb:0.5,top:0.98,tag:0.92},
+      credit:`<a href="https://sketchfab.com/3d-models/seat-ibiza-mk4-2008-2017-37a903d1a5c04138af2d5aa02a3b88f2" target="_blank" rel="noopener">Seat Ibiza MK4 2008-2017</a> by DEMON_SCARY1235, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>`},
+    id:"ibiza",plate:"4087308",name:"SEAT Ibiza",year:"2016 · White",color:"#e4e6ea",metal:0.05,
     L:4.06,W:1.69,r:0.31,axles:[1.24,-1.23],cowlX:0.80,bay:0.52,beltY:1.02,beltRise:0.03,tumble:0.18,rt:0.14,suv:false,
     roofRear:-1.60,roofFront:0.0,rwX:-2.0,sgX:-1.74,hlY:[0.64,0.78],tlY:[0.78,0.98],
     top:[[-2.03,0.85],[-2.01,1.05],[-1.86,1.33],[-1.60,1.42],[-0.50,1.445],[0.0,1.42],[0.40,1.20],[0.80,0.97],[1.40,0.92],[1.80,0.85],[1.97,0.77],[2.03,0.64]],
@@ -304,7 +312,7 @@ function renderPicker(){
       n("ok")?`<span class="pill s-ok">${n("ok")} OK</span>`:"", n("none")?`<span class="pill s-none">${n("none")} no record</span>`:""].join("");
     const pic = Viewer.thumb(c);
     return `<button class="car-card" data-car="${c.id}">${pic?`<img class="carpic" src="${pic}" alt="${c.name}, ${c.year}">`:silhouette(c)}
-      <div class="meta"><h2>${c.name}</h2><span class="yr">${c.year}</span></div>
+      <div class="meta"><h2>${c.name}</h2></div>
       <div class="meta"><span class="num">${km?fmtKm(km):"Odometer not set"}</span></div>
       <div class="pills">${pills}</div></button>`;
   }).join("");
@@ -336,7 +344,7 @@ function showCar(id){
   current=CARS[id]; $("picker").hidden=true; $("carview").hidden=false;
   $("cv-name").textContent=current.name; $("cv-year").textContent=current.year;
   $("odo").value=currentKm(id)||""; renderTable(); Viewer.load(current); window.scrollTo(0,0);
-  $("credit").hidden = !current.glb;
+  showCredit();
 }
 $("cars").addEventListener("click",e=>{ const b=e.target.closest("[data-car]"); if(b) location.hash=b.dataset.car; });
 $("back").addEventListener("click",()=>{ location.hash=""; history.replaceState(null,"",location.pathname+location.search); route(); });
@@ -541,23 +549,50 @@ const Viewer = (()=>{
     return g;
   }
 
-  /* The real Ateca model (front along +z, 1 unit = 1.71/4.36 m): scaled to metres, turned to
-     face +x, painted navy. Its separate hood panel (body_12) is moved onto the hinge. */
+  /* Real car models (front along +z): scaled to metres, turned to face +x and repainted.
+     Each model's own hood panel is moved onto the hinge. A model that ships one loose
+     wheel at its origin gets it copied to all four corners. */
+  // Israeli plate: yellow, black digits (2-3-2), blue IL band on the left
+  const plates={};
+  function plateTexture(num){
+    if(plates[num]) return plates[num];
+    const cv=document.createElement("canvas"); cv.width=1040; cv.height=220; const x=cv.getContext("2d");
+    const rr=(X,Y,W,H,R)=>{ x.beginPath(); x.moveTo(X+R,Y); x.arcTo(X+W,Y,X+W,Y+H,R); x.arcTo(X+W,Y+H,X,Y+H,R); x.arcTo(X,Y+H,X,Y,R); x.arcTo(X,Y,X+W,Y,R); x.closePath(); };
+    x.fillStyle="#111"; rr(0,0,1040,220,22); x.fill();
+    x.fillStyle="#f6c40f"; rr(8,8,1024,204,16); x.fill();
+    x.fillStyle="#1e4fb3"; rr(8,8,120,204,16); x.fill(); x.fillRect(100,8,28,204);
+    x.fillStyle="#fff"; x.textAlign="center"; x.textBaseline="middle"; x.font="bold 54px Arial, sans-serif"; x.fillText("IL",68,168);
+    x.strokeStyle="#fff"; x.lineWidth=5; x.strokeRect(38,34,60,44); x.beginPath(); x.moveTo(38,42); x.lineTo(98,42); x.moveTo(38,70); x.lineTo(98,70); x.stroke();
+    const d=String(num).replace(/D/g,""), t=d.length===7?d.slice(0,2)+"-"+d.slice(2,5)+"-"+d.slice(5):d.length===8?d.slice(0,3)+"-"+d.slice(3,5)+"-"+d.slice(5):d;
+    x.fillStyle="#111"; x.font="bold 168px \"Arial Narrow\", \"Barlow Condensed\", Arial, sans-serif"; x.fillText(t,585,118,860);
+    const tex=new THREE.CanvasTexture(cv); tex.encoding=THREE.sRGBEncoding; tex.anisotropy=8; return plates[num]=tex;
+  }
   function addGlb(G,c,paint,px,py){
-    const root=new THREE.Group(), inner=c.glb.clone(true);
-    root.scale.setScalar(2.55); root.rotation.y=Math.PI/2; inner.position.x=-0.035; root.add(inner); G.add(root);
-    let hood=null;
+    const M=c.model, root=new THREE.Group(), inner=c.glb.clone(true);
+    root.scale.setScalar(M.scale); root.rotation.y=Math.PI/2; inner.position.set(...M.shift); root.add(inner); G.add(root);
+    let hood=null; const loose=[];
     inner.traverse(o=>{
-      if(!hood && /body_12/i.test(o.name)) hood=o;
+      if(!hood && M.hood.test(o.name)) hood=o;
+      if(M.wheel && M.wheel.test(o.name)) loose.push(o);
       if(!o.isMesh) return;
       const n=(o.material.name||"").toLowerCase();
-      if(n==="body") o.material=paint;
-      else if(/glass/.test(n) && n!=="r_glass"){ o.material=o.material.clone(); o.material.color.set(0x0b0f16); o.material.opacity=0.82; o.material.roughness=0.05; }
-      if(/black_matt_45/i.test(o.name)) o.visible=false;
+      if(M.paint.test(n)) o.material=paint;
+      else if(M.mats && M.mats[n]){ const [col,rough,met]=M.mats[n]; o.material=o.material.clone(); o.material.map=null; o.material.color.set(col); o.material.roughness=rough; o.material.metalness=met; }
+      else if(/glass/.test(n) && n!=="r_glass"){ o.material=o.material.clone(); o.material.color.set(0x0b0f16); o.material.opacity=0.82; o.material.transparent=true; o.material.roughness=0.05; }
+      if(M.hide && M.hide.test(o.name)) o.visible=false;
     });
+    if(M.plate && c.plate){ const tex=plateTexture(c.plate);
+      [[M.plate.front,0],[M.plate.rear,Math.PI]].forEach(([[y,z],ry])=>{ const g=new THREE.Group(); g.position.set(0,y,z); g.rotation.y=ry;
+        g.add(new THREE.Mesh(new THREE.PlaneGeometry(0.52,0.11),new THREE.MeshStandardMaterial({map:tex,roughness:0.45,metalness:0})));
+        const back=new THREE.Mesh(new THREE.BoxGeometry(0.535,0.122,0.012),new THREE.MeshStandardMaterial({color:0x15171b,roughness:0.6})); back.position.z=-0.007; g.add(back);
+        inner.add(g); }); }
+    if(loose.length){
+      const wheel=new THREE.Group(); loose.forEach(o=>{ o.parent.remove(o); wheel.add(o); });
+      M.axles.forEach(z=>[1,-1].forEach(s=>{ const w=wheel.clone(true); w.position.set(s*M.track,M.wheelY,z); if(s<0) w.rotation.y=Math.PI; inner.add(w); }));
+    }
     hoodPivot=new THREE.Group(); hoodPivot.position.set(px,py,0); G.add(hoodPivot);
     hoodMesh=hood;
-    if(hood){ G.updateMatrixWorld(true); hoodPivot.attach(hood); hood.traverse(o=>{ if(o.isMesh){ o.userData.hood=true; o.material=paint; } }); }
+    if(hood){ G.updateMatrixWorld(true); hoodPivot.attach(hood); hood.traverse(o=>{ if(o.isMesh) o.userData.hood=true; }); }
   }
 
   function build(c){
@@ -566,7 +601,7 @@ const Viewer = (()=>{
     const glass=new THREE.MeshPhysicalMaterial({color:0x06080c,metalness:0,roughness:0.05,clearcoat:0.6,envMapIntensity:0.45,side:THREE.DoubleSide});
     const black=new THREE.MeshStandardMaterial({color:0x17191d,roughness:0.75,side:THREE.DoubleSide});
     const chrome=mat(0xd9dde3,{metalness:1,roughness:0.18});
-    const px=c.glb?1.02:c.cowlX+0.04, py=c.glb?1.10:sh.topAt(px), wy=c.glb?1.08:sh.topAt(c.cowlX-0.06)+0.02, cb=c.glb?0.55:c.bay;
+    const B=c.glb?c.model.bay:null, px=B?B.px:c.cowlX+0.04, py=B?B.py:sh.topAt(px), wy=B?B.wy:sh.topAt(c.cowlX-0.06)+0.02, cb=B?B.cb:c.bay;
     if(c.glb){ addGlb(G,c,paint,px,py); }
     else {
     const over=o=>Object.assign(o,{polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-4});
@@ -622,7 +657,7 @@ const Viewer = (()=>{
     c.axles.forEach(x=>[1,-1].forEach(s=>{ const wh=wheel(c,s,tireM,rimM,darkM,discM,calM); wh.position.set(x,c.r,s*(sh.hwAt(x)-0.1)); G.add(wh); }));
     }
     // engine bay
-    const fl=cb+0.02, x1=F-0.12, mid=(px+x1)/2-0.05, Tpx=c.glb?1.06:sh.topAt(px);
+    const fl=cb+0.02, x1=F-0.12, mid=(px+x1)/2-0.05, Tpx=B?B.top:sh.topAt(px);
     const hwB=sh.hwAt(px+0.3)*(c.glb?0.82:0.9), hwF=sh.hwAt(F-0.35)*(c.glb?0.8:0.9);
     G.add(box(x1-px,0.02,sh.hwAt(mid)*(c.glb?1.6:1.9),mat(0x2c3036),(px+x1)/2,cb,0));
     G.add(box(0.04,Tpx-cb,sh.hwAt(px)*(c.glb?1.6:1.85),mat(0x1c1f24),px-0.01,(cb+Tpx)/2,0));
@@ -651,7 +686,7 @@ const Viewer = (()=>{
     S_("tires",c.axles[0],c.r*1.95,sh.hwAt(c.axles[0])-0.06,0);
     S_("brakepads",c.axles[1],c.r,sh.hwAt(c.axles[1])+0.05,0);
     spots.forEach(s=>{ s.mesh=new THREE.Mesh(new THREE.SphereGeometry(0.045,16,12),new THREE.MeshBasicMaterial({color:0x888888,toneMapped:false})); s.mesh.position.copy(s.pos); s.mesh.userData.part=s.part; G.add(s.mesh); });
-    c._hoodTagY=(c.glb?1.02:sh.topAt((px+x1)/2))+0.05; c._hoodTagX=(px+x1)/2;
+    c._hoodTagY=(B?B.tag:sh.topAt((px+x1)/2))+0.05; c._hoodTagX=(px+x1)/2;
     return G;
   }
 
@@ -751,19 +786,20 @@ const Viewer = (()=>{
   return {load,stop,refreshStatus,thumb,resetThumb:id=>{ delete thumbs[id]; }};
 })();
 
-/* the real Ateca model, loaded next to the page; the drawn model shows until it arrives */
-function loadAtecaModel(){
-  try{
-    if(!window.THREE || !THREE.GLTFLoader || !window.MeshoptDecoder) return;
-    new THREE.GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load("ateca.glb",g=>{
-      CARS.ateca.glb=g.scene; Viewer.resetThumb("ateca"); renderPicker();
-      if(current && current.id==="ateca"){ Viewer.load(current); $("credit").hidden=false; }
-    },undefined,()=>{});
-  }catch(e){}
+/* the real car models, loaded next to the page; the drawn model shows until each arrives */
+function showCredit(){ const m=current&&current.glb&&current.model; $("credit").hidden=!m; if(m) $("credit").innerHTML="3D model: "+m.credit; }
+function loadModels(){
+  if(!window.THREE || !THREE.GLTFLoader || !window.MeshoptDecoder) return;
+  Object.values(CARS).forEach(c=>{ if(!c.model) return;
+    try{ new THREE.GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(c.model.file,g=>{
+      c.glb=g.scene; Viewer.resetThumb(c.id); renderPicker();
+      if(current && current.id===c.id){ Viewer.load(current); showCredit(); }
+    },undefined,()=>{}); }catch(e){}
+  });
 }
 
 /* boot */
-route(); renderAll(); initStore(); loadAtecaModel();
+route(); renderAll(); initStore(); loadModels();
 </script>
 
 </body>
