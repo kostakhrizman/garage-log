@@ -51,10 +51,14 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
 
 /* picker */
 .cars{display:flex;flex-direction:column;gap:14px}
-.car-card{display:block;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:0;overflow:hidden;transition:transform .15s}
+.car-card{display:block;background:none;border:0;border-radius:18px;padding:0;transition:transform .15s}
 .car-card:active{transform:scale(.985)}
 .car-card svg,.car-card .carpic{width:100%;height:auto;max-width:100%;display:block}
-.car-card .carpic{aspect-ratio:900/520;background:radial-gradient(90% 70% at 50% 75%,var(--stage),transparent)}
+.car-card .carpic{aspect-ratio:900/520}
+.spin,.carpic.wait{position:relative}
+.carpic.wait::after,.stage.loading::after{content:"";position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stage.loading .hoodbtn,.stage.loading .hint{visibility:hidden}
 .pills{display:flex;gap:6px;flex-wrap:wrap}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
 .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
@@ -69,7 +73,7 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
 .odo input{width:92px;background:transparent;border:0;color:inherit;font-family:var(--f-display);font-size:20px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums;padding:0}
 .odo input::-webkit-inner-spin-button{display:none}
 .odo span{font-size:12px;opacity:.75}
-.stage{position:relative;height:min(58vh,440px);min-height:300px;border-radius:18px;overflow:hidden;background:radial-gradient(120% 90% at 50% 70%,var(--surface),var(--stage));border:1px solid var(--line);touch-action:none}
+.stage{position:sticky;top:0;z-index:5;height:min(58vh,440px);min-height:300px;border-radius:18px;overflow:hidden;background:radial-gradient(120% 90% at 50% 70%,var(--surface),var(--stage));border:1px solid var(--line);touch-action:none}
 .stage canvas{display:block;width:100%;height:100%}
 .labels{position:absolute;inset:0;pointer-events:none}
 .tag{position:absolute;left:0;top:0;transform:translate(-50%,-130%);pointer-events:auto;display:flex;align-items:center;gap:6px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 10px 5px 7px;font-size:12.5px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px rgba(10,20,40,.18)}
@@ -303,7 +307,7 @@ function silhouette(c){
 function renderPicker(){
   $("cars").innerHTML = Object.values(CARS).map(c=>{
     const pic = Viewer.thumb(c);
-    return `<button class="car-card" data-car="${c.id}" aria-label="${c.name}">${pic?`<img class="carpic" src="${pic}" alt="">`:silhouette(c)}</button>`;
+    return `<button class="car-card" data-car="${c.id}" aria-label="${c.name}">${pic?`<img class="carpic" src="${pic}" alt="">`:`<div class="carpic wait"></div>`}</button>`;
   }).join("");
 }
 function renderTable(){
@@ -332,7 +336,7 @@ function showPicker(){ current=null; closeSheet(); $("carview").hidden=true; $("
 function showCar(id){
   current=CARS[id]; $("picker").hidden=true; $("carview").hidden=false;
   $("cv-name").textContent=current.name; $("cv-year").textContent=current.year;
-  $("odo").value=currentKm(id)||""; renderTable(); Viewer.load(current); window.scrollTo(0,0);
+  $("odo").value=currentKm(id)||""; window.scrollTo(0,0); measureStage(); renderTable(); Viewer.load(current);
   showCredit();
 }
 $("cars").addEventListener("click",e=>{ const b=e.target.closest("[data-car]"); if(b) location.hash=b.dataset.car; });
@@ -706,6 +710,7 @@ const Viewer = (()=>{
   }
   $("hoodbtn").addEventListener("click",()=>{ if(spec) toggleHood(); });
   function tap(e){
+    if(!car||!spec) return;
     const r=renderer.domElement.getBoundingClientRect();
     const m=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
     const ray=new THREE.Raycaster(); ray.setFromCamera(m,camera);
@@ -746,7 +751,11 @@ const Viewer = (()=>{
   }
   function load(c){
     if(!init()) return;
-    spec=c; if(car){ scene.remove(car); car.traverse(o=>{ o.geometry&&o.geometry.dispose(); }); }
+    if(car){ scene.remove(car); car.traverse(o=>{ o.geometry&&o.geometry.dispose(); }); car=null; }
+    if(c.model && !c.glb){ // real model still downloading: show an empty stage with a spinner
+      spec=null; stop(); spots=[]; hoodTag=null; labels.innerHTML=""; renderer.clear(); stage.classList.add("loading"); return; }
+    stage.classList.remove("loading");
+    spec=c;
     hoodTarget=0; hoodAngle=0; $("hoodbtn").textContent="Open hood"; $("hint").textContent="Tap the hood to open it · drag to turn";
     car=build(c); scene.add(car); makeTags(); refreshStatus();
     resize(); const h=view(false); camera.position.copy(h.p); controls.target.copy(h.t); camGoal=null;
@@ -756,6 +765,7 @@ const Viewer = (()=>{
   // picker pictures: render each 3D car once to an image
   const thumbs={};
   function thumb(c){
+    if(c.model && !c.glb) return null;            // wait for the real model
     if(thumbs[c.id]!==undefined) return thumbs[c.id];
     thumbs[c.id]=null;
     try{
@@ -786,6 +796,16 @@ function loadModels(){
     },undefined,()=>{}); }catch(e){}
   });
 }
+
+/* car page: as the list scrolls up, the 3D view stays on top and shrinks to ~60% height */
+const stageFit={h0:0,top:0,raf:0};
+function measureStage(){ const st=$("stage"); st.style.height=""; st.style.minHeight="";
+  stageFit.h0=st.getBoundingClientRect().height; stageFit.top=st.getBoundingClientRect().top+scrollY; fitStage(); }
+function fitStage(){ stageFit.raf=0; if($("carview").hidden||!stageFit.h0) return;
+  const cut=Math.max(0,Math.min(stageFit.h0*0.4, scrollY-stageFit.top));
+  const st=$("stage"); st.style.minHeight="0"; st.style.height=(stageFit.h0-cut)+"px"; }
+addEventListener("scroll",()=>{ if(!stageFit.raf) stageFit.raf=requestAnimationFrame(fitStage); },{passive:true});
+addEventListener("resize",()=>{ if(!$("carview").hidden) measureStage(); });
 
 /* boot */
 route(); renderAll(); initStore(); loadModels();
