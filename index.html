@@ -65,15 +65,16 @@ button:focus-visible,input:focus-visible,.row:focus-visible,.car-card:focus-visi
 .s-ok{color:var(--ok)} .s-soon{color:var(--soon)} .s-late{color:var(--late)} .s-none{color:var(--none)}
 
 /* car view */
-.topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.topbar{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;position:sticky;top:0;z-index:6;background:var(--bg);padding:10px 0;margin:-10px 0 -4px}
 .back{border:1px solid var(--line);background:var(--surface);border-radius:10px;width:40px;height:40px;display:grid;place-items:center;flex:none}
-.topbar .t{min-width:0;flex:1 1 150px}
+.topbar .t{min-width:0;flex:1 1 auto;overflow:hidden}
+.topbar .t h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .odo{display:flex;align-items:center;gap:8px;background:var(--ink);color:var(--bg);border-radius:10px;padding:6px 10px;flex:none}
 .odo label{font-family:var(--f-display);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.75}
-.odo input{width:92px;background:transparent;border:0;color:inherit;font-family:var(--f-display);font-size:20px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums;padding:0}
+.odo input{width:84px;background:transparent;border:0;color:inherit;font-family:var(--f-display);font-size:20px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums;padding:0}
 .odo input::-webkit-inner-spin-button{display:none}
 .odo span{font-size:12px;opacity:.75}
-.stage{position:sticky;top:0;z-index:5;height:min(58vh,440px);min-height:300px;border-radius:18px;overflow:hidden;background:radial-gradient(120% 90% at 50% 70%,var(--surface),var(--stage));border:1px solid var(--line);touch-action:none}
+.stage{position:sticky;top:var(--bar,0px);z-index:5;height:min(58vh,440px);min-height:300px;border-radius:18px;overflow:hidden;background:radial-gradient(120% 90% at 50% 70%,var(--surface),var(--stage));border:1px solid var(--line);touch-action:none}
 .stage canvas{display:block;width:100%;height:100%}
 .labels{position:absolute;inset:0;pointer-events:none}
 .tag{position:absolute;left:0;top:0;transform:translate(-50%,-130%);pointer-events:auto;display:flex;align-items:center;gap:6px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 10px 5px 7px;font-size:12.5px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px rgba(10,20,40,.18)}
@@ -799,12 +800,13 @@ function loadModels(){
 
 /* car page: as the list scrolls up, the 3D view stays on top and shrinks to ~60% height */
 const stageFit={h0:0,top:0,raf:0};
-function measureStage(){ const st=$("stage"); st.style.height=""; st.style.minHeight="";
+function measureStage(){ const st=$("stage"), bar=document.querySelector("#carview .topbar").getBoundingClientRect().height;
+  stageFit.bar=bar; st.style.setProperty("--bar",bar+"px"); st.style.height=""; st.style.minHeight="";
   stageFit.h0=st.getBoundingClientRect().height; stageFit.top=st.getBoundingClientRect().top+scrollY; fitStage(); }
 function fitStage(){ stageFit.raf=0; if($("carview").hidden||!stageFit.h0) return;
-  const cut=Math.max(0,Math.min(stageFit.h0*0.4, scrollY-stageFit.top));
+  const cut=Math.max(0,Math.min(stageFit.h0*0.4, scrollY-(stageFit.top-stageFit.bar)));
   const st=$("stage"); st.style.minHeight="0"; st.style.height=(stageFit.h0-cut)+"px"; }
-addEventListener("scroll",()=>{ if(!stageFit.raf) stageFit.raf=requestAnimationFrame(fitStage); },{passive:true});
+addEventListener("scroll",fitStage,{passive:true});
 addEventListener("resize",()=>{ if(!$("carview").hidden) measureStage(); });
 
 /* boot */
