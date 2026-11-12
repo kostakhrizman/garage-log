@@ -184,18 +184,18 @@ const PARTS = [
 const PART = Object.fromEntries(PARTS.map(p=>[p.id,p]));
 
 const CARS = {
-  ateca:{id:"ateca",name:"SEAT Ateca",year:"2017 · Navy blue",color:"#0e1a3c",metal:0.4,
-    L:4.36,W:1.84,r:0.355,axles:[1.31,-1.33],cowlX:0.92,bay:0.62,beltY:1.14,beltRise:0.02,tumble:0.16,rt:0.16,suv:true,
-    roofRear:-1.98,roofFront:0.10,rwX:-2.14,sgX:-1.86,
-    top:[[-2.18,0.98],[-2.15,1.22],[-1.98,1.58],[-1.6,1.62],[0.10,1.64],[0.92,1.10],[1.9,1.03],[2.12,0.92],[2.18,0.78]],
+  ateca:{id:"ateca",name:"SEAT Ateca",year:"2017 · Navy blue",color:"#0b1736",metal:0.45,
+    L:4.36,W:1.84,r:0.355,axles:[1.31,-1.33],cowlX:0.95,bay:0.62,beltY:1.14,beltRise:0.02,tumble:0.16,rt:0.16,suv:true,
+    roofRear:-1.80,roofFront:0.12,rwX:-2.15,sgX:-1.86,hlY:[0.76,0.90],tlY:[0.86,1.06],
+    top:[[-2.18,0.95],[-2.16,1.20],[-2.02,1.50],[-1.80,1.60],[-0.60,1.635],[0.12,1.60],[0.50,1.37],[0.95,1.09],[1.50,1.05],[1.95,0.98],[2.12,0.90],[2.18,0.76]],
     bot:[[-2.18,0.50],[-2.0,0.34],[1.85,0.34],[2.18,0.46]],
     cowl:[0.92,1.08],
     body:[[-2.15,0.32],[-2.18,0.92],[-2.16,1.18],[-1.98,1.60],[0.10,1.63],[0.92,1.08],[0.92,0.84],[2.14,0.84],[2.18,0.70],[2.16,0.32]],
     glass:[[0.80,1.205],[0.174,1.625],[-2.03,1.62],[-2.196,1.20],[-2.0,1.16],[0.80,1.16]], bpillar:-0.55},
-  ibiza:{id:"ibiza",name:"SEAT Ibiza",year:"2016 · White",color:"#f3f4f6",metal:0.05,
-    L:4.06,W:1.69,r:0.31,axles:[1.24,-1.23],cowlX:0.78,bay:0.52,beltY:1.02,beltRise:0.03,tumble:0.18,rt:0.14,suv:false,
-    roofRear:-1.76,roofFront:-0.02,rwX:-1.99,sgX:-1.74,
-    top:[[-2.03,0.88],[-2.0,1.06],[-1.76,1.40],[-1.4,1.45],[-0.02,1.46],[0.78,1.00],[1.75,0.93],[1.98,0.82],[2.03,0.68]],
+  ibiza:{id:"ibiza",name:"SEAT Ibiza",year:"2016 · White",color:"#e4e6ea",metal:0.05,
+    L:4.06,W:1.69,r:0.31,axles:[1.24,-1.23],cowlX:0.80,bay:0.52,beltY:1.02,beltRise:0.03,tumble:0.18,rt:0.14,suv:false,
+    roofRear:-1.60,roofFront:0.0,rwX:-2.0,sgX:-1.74,hlY:[0.64,0.78],tlY:[0.78,0.98],
+    top:[[-2.03,0.85],[-2.01,1.05],[-1.86,1.33],[-1.60,1.42],[-0.50,1.445],[0.0,1.42],[0.40,1.20],[0.80,0.97],[1.40,0.92],[1.80,0.85],[1.97,0.77],[2.03,0.64]],
     bot:[[-2.03,0.42],[-1.85,0.26],[1.80,0.26],[2.03,0.38]],
     cowl:[0.78,0.98],
     body:[[-2.0,0.28],[-2.03,0.84],[-2.0,1.06],[-1.76,1.42],[-0.02,1.45],[0.78,0.98],[0.78,0.74],[1.99,0.74],[2.03,0.62],[2.01,0.28]],
@@ -451,16 +451,20 @@ const Viewer = (()=>{
      and pinches at the nose and tail. Each face is then sorted into paint, glass,
      black trim, or the hood panel, and wheel arches are cut out. */
   function shell(c){
-    const F=c.L/2, N=120, M=36, R=2*M-2;
-    const hwAt=x=>{ const s=Math.max(0,(Math.abs(x)-(F-0.75))/0.75); return c.W/2*(1-0.06*s*s-0.12*s*s*s*s); };
+    const F=c.L/2, N=150, M=44, R=2*M-2, AR=c.r+0.07;
+    const sstep=t=>{ t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); };
+    const hwAt=x=>{ const s=Math.max(0,(Math.abs(x)-(F-0.9))/0.9); return c.W/2*(1-0.05*s*s-0.10*s*s*s*s); };
     const beltAt=x=>c.beltY-x*c.beltRise;
+    // plan-view bow: the nose and tail curve back toward the corners
+    const bowAt=x=> x>0 ? 0.13*sstep((x-(F-1.2))/1.2) : -0.07*sstep((-x-(F-0.9))/0.9);
     const xs=[],T0=[],B0=[];
     for(let i=0;i<N;i++){ const x=-F+2*F*i/(N-1); xs.push(x); T0.push(poly(c.top,x)); B0.push(poly(c.bot,x)); }
-    const T=smooth(T0,4), B=smooth(B0,3);
-    const pos=[], kind=[];
+    const T=smooth(T0,6), B=smooth(B0,4);
+    const pos=[], kind=[], ins=[];
     for(let i=0;i<N;i++){
       const x=xs[i], hw=hwAt(x), b=B[i], t=T[i], h=t-b, belt=beltAt(x);
-      const rb=Math.min(0.1,h*0.3), rt=Math.min(c.rt,h*0.35,hw*0.5);
+      const g=sstep((t-belt-0.04)/0.22);                    // 1 over the cabin, 0 over hood and tail
+      const rb=Math.min(0.1,h*0.3), rt=Math.min(c.rt,h*0.35,hw*0.5), crown=0.03+0.03*g, bow=bowAt(x);
       const L1=hw-rb, L2=Math.PI/2*rb, L3=Math.max(0,h-rb-rt), L4=Math.PI/2*rt, L5=hw-rt, tot=L1+L2+L3+L4+L5;
       const half=[];
       for(let k=0;k<M;k++){
@@ -470,27 +474,36 @@ const Viewer = (()=>{
         else if((s-=L2)<L3){ z=hw; y=b+rb+s; kd=2; }
         else if((s-=L3)<L4){ const a=s/rt; z=hw-rt+rt*Math.cos(a); y=t-rt+rt*Math.sin(a); kd=3; }
         else { s-=L4; z=Math.max(0,hw-rt-s); y=t; kd=4; }
-        if(y>belt && t>belt) z*=1-c.tumble*Math.min(1,(y-belt)/(t-belt));
-        half.push([z,y,kd]);
+        const u=(y-b)/h;
+        z*=0.955+0.045*Math.sin(Math.PI/2*Math.min(1,u/0.6));                       // sills tuck in
+        if(y>belt) z*=1-c.tumble*g*Math.min(1,(y-belt)/Math.max(0.05,t-belt));      // cabin leans in
+        y-=crown*Math.pow(z/hw,2)*u*u*u;                                            // crowned roof and hood
+        let xx=x-bow*Math.pow(z/hw,2), inside=false;
+        if(kd<=2 && z>0.35*hw) for(const ax of c.axles){
+          const dx=xx-ax, dy=y-c.r, d=Math.hypot(dx,dy);
+          if(d<AR){ inside=true; if(d>1e-4){ xx=ax+dx/d*AR; y=c.r+dy/d*AR; } z+=0.03; }   // clean round arch edge
+          else if(d<AR+0.14) z+=0.03*(1-(d-AR)/0.14);                                    // arch flare
+        }
+        half.push([xx,y,z,kd,inside]);
       }
-      const ring=half.concat(half.slice(1,M-1).reverse().map(([z,y,k])=>[-z,y,k]));
-      ring.forEach(([z,y,k])=>{ pos.push(x,y,z); kind.push(k); });
+      const ring=half.concat(half.slice(1,M-1).reverse().map(p=>[p[0],p[1],-p[2],p[3],p[4]]));
+      ring.forEach(p=>{ pos.push(p[0],p[1],p[2]); kind.push(p[3]); ins.push(p[4]); });
     }
-    const idx={paint:[],glass:[],black:[],hood:[],side:[],low:[]};
+    const idx={paint:[],glass:[],black:[],hood:[],side:[],low:[],head:[],tail:[]};
     const P=i=>[pos[3*i],pos[3*i+1],pos[3*i+2]];
-    const hoodX0=c.cowlX+0.04, hoodX1=F-0.12;
+    const hoodX0=c.cowlX+0.04, hoodX1=F-0.16;
     for(let i=0;i<N-1;i++) for(let j=0;j<R;j++){
       const a=i*R+j, b2=(i+1)*R+j, cc=(i+1)*R+(j+1)%R, d=i*R+(j+1)%R;
+      if(ins[a]&&ins[b2]&&ins[cc]&&ins[d]) continue;                                  // wheel arch opening
       const pa=P(a),pc=P(cc), xc=(pa[0]+pc[0])/2, yc=(pa[1]+pc[1])/2, zc=Math.abs((pa[2]+pc[2])/2);
-      const kf=Math.max(kind[a],kind[d]), hw=hwAt(xc), belt=beltAt(xc), b=B[i];
-      let cut=false;
-      c.axles.forEach(ax=>{ const d2=(xc-ax)**2+(yc-c.r)**2; if(d2<(c.r+0.075)**2 && kf<=2 && zc>0.35*hw) cut=true; });
-      if(cut) continue;
+      const kf=Math.max(kind[a],kind[d]), hw=hwAt(xs[i]), belt=beltAt(xc);
       let g="paint";
-      if(xc>hoodX0 && xc<hoodX1 && kf>=3) g="hood";
+      if(xc>hoodX0 && xc<hoodX1 && kf===4) g="hood";
       else if(kf===0) g="black";
       else if(kf===4 && xc>c.roofFront+0.03 && xc<c.cowlX-0.03 && yc>belt) g="glass";            // windshield
       else if(kf===4 && xc>c.rwX && xc<c.roofRear-0.02 && yc>belt+0.03) g="glass";               // rear window
+      else if((kf===2||kf===3) && xs[i]>F-0.30 && yc>c.hlY[0]+0.01 && yc<c.hlY[1]-0.01 && zc>0.62*hw) g="head";
+      else if((kf===2||kf===3) && xs[i]<-F+0.26 && yc>c.tlY[0] && yc<c.tlY[1] && zc>0.5*hw) g="tail";
       const q=[a,b2,cc,a,cc,d];
       idx[g].push(...q);
       // overlays cut by straight clipping planes, so their edges stay clean
@@ -501,9 +514,9 @@ const Viewer = (()=>{
     [0,N-1].forEach(i=>{ const cy=(T[i]+B[i])/2, ci=pos.length/3; pos.push(xs[i],cy,0);
       for(let j=0;j<R;j++) idx.paint.push(ci,i*R+j,i*R+(j+1)%R); });
     const geo=new THREE.BufferGeometry(); geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
-    geo.setIndex([].concat(idx.paint,idx.glass,idx.black,idx.hood)); geo.computeVertexNormals();
+    geo.setIndex([].concat(idx.paint,idx.glass,idx.black,idx.hood,idx.head,idx.tail)); geo.computeVertexNormals();
     const mk=(list,m)=>{ const g=new THREE.BufferGeometry(); g.setAttribute("position",geo.attributes.position); g.setAttribute("normal",geo.attributes.normal); g.setIndex(list); return new THREE.Mesh(g,m); };
-    return {mk,idx,hwAt,beltAt,topAt:x=>poly(c.top,x),Tn:T[N-1],Bn:B[N-1],T0:T[0],B0:B[0],F};
+    return {mk,idx,hwAt,beltAt,bowAt,topAt:x=>poly(c.top,x),Tn:T[N-1],Bn:B[N-1],T0:T[0],B0:B[0],F};
   }
 
   function wheel(c,side,tireM,rimM,darkM,discM,caliperM){
@@ -553,7 +566,7 @@ const Viewer = (()=>{
 
   function build(c){
     const G=new THREE.Group(), sh=shell(c), F=sh.F, W=c.W;
-    const paint=new THREE.MeshPhysicalMaterial({color:c.color,metalness:c.metal,roughness:0.32,clearcoat:1,clearcoatRoughness:0.06,envMapIntensity:c.metal>0.3?0.75:1,side:THREE.DoubleSide});
+    const paint=new THREE.MeshPhysicalMaterial({color:c.color,metalness:c.metal,roughness:0.32,clearcoat:1,clearcoatRoughness:0.06,envMapIntensity:c.metal>0.3?0.5:0.45,side:THREE.DoubleSide});
     const glass=new THREE.MeshPhysicalMaterial({color:0x06080c,metalness:0,roughness:0.05,clearcoat:0.6,envMapIntensity:0.45,side:THREE.DoubleSide});
     const black=new THREE.MeshStandardMaterial({color:0x17191d,roughness:0.75,side:THREE.DoubleSide});
     const chrome=mat(0xd9dde3,{metalness:1,roughness:0.18});
@@ -563,12 +576,14 @@ const Viewer = (()=>{
     const over=o=>Object.assign(o,{polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-4});
     const rise=c.beltRise, n=Math.hypot(rise,1);
     const sideGlass=over(glass.clone()); sideGlass.clippingPlanes=[new THREE.Plane(new THREE.Vector3(rise/n,1/n,0),-(c.beltY+0.02)/n)];
-    G.add(sh.mk(sh.idx.paint,paint), sh.mk(sh.idx.glass,glass), sh.mk(sh.idx.black,black), sh.mk(sh.idx.side,sideGlass));
+    const head=mat(0xc9d3e2,{emissive:0xe6ecff,emissiveIntensity:0.3,metalness:0.6,roughness:0.12,side:THREE.DoubleSide});
+    const tail=mat(0xa3101a,{emissive:0x8a0812,emissiveIntensity:0.9,roughness:0.2,side:THREE.DoubleSide});
+    G.add(sh.mk(sh.idx.paint,paint), sh.mk(sh.idx.glass,glass), sh.mk(sh.idx.black,black), sh.mk(sh.idx.side,sideGlass), sh.mk(sh.idx.head,head), sh.mk(sh.idx.tail,tail));
     if(c.suv){ const clad=over(black.clone()); clad.clippingPlanes=[new THREE.Plane(new THREE.Vector3(0,-1,0),0.54)]; G.add(sh.mk(sh.idx.low,clad)); }
     // wheel-arch lips hide the cut edge
     c.axles.forEach(ax=>[1,-1].forEach(s=>{
-      const lip=new THREE.Mesh(new THREE.TorusGeometry(c.r+0.08,c.suv?0.055:0.03,10,36,Math.PI),c.suv?black:paint);
-      lip.position.set(ax,c.r,s*(sh.hwAt(ax)-(c.suv?0.01:0.02))); lip.scale.z=c.suv?0.6:0.8; G.add(lip);
+      const lip=new THREE.Mesh(new THREE.TorusGeometry(c.r+0.075,c.suv?0.04:0.014,10,48,Math.PI),c.suv?black:paint);
+      lip.position.set(ax,c.r,s*(sh.hwAt(ax)+0.012)); lip.scale.z=c.suv?0.55:1; G.add(lip);
     }));
     // hood: same shell faces, hinged at the cowl
     hoodPivot=new THREE.Group(); hoodPivot.position.set(px,py,0);
@@ -580,24 +595,24 @@ const Viewer = (()=>{
       well.rotation.x=Math.PI/2; well.position.set(ax,c.r,s*(sh.hwAt(ax)-0.16)); G.add(well);
     }));
     // lights, grille, intakes
-    const head=mat(0xf6f8ff,{emissive:0xe6ecff,emissiveIntensity:0.9,metalness:0.3,roughness:0.15});
     const drl=mat(0xffffff,{emissive:0xffffff,emissiveIntensity:1.4});
-    const tail=mat(0xa3101a,{emissive:0x8a0812,emissiveIntensity:0.9,roughness:0.2});
     const hwN=sh.hwAt(F), hwT=sh.hwAt(-F);
     [1,-1].forEach(s=>{
-      const hl=box(0.05,0.09,0.36,head,F-0.005,sh.Tn-0.1,s*hwN*0.6); hl.rotation.x=s*0.08; G.add(hl);
-      G.add(box(0.052,0.015,0.34,drl,F,sh.Tn-0.155,s*hwN*0.6));
-      G.add(box(0.05,0.08,0.4,tail,-F+0.005,sh.T0-0.14,s*hwT*0.62));
+      const bw=sh.bowAt(F)*0.4, hy=(c.hlY[0]+c.hlY[1])/2, ty=(c.tlY[0]+c.tlY[1])/2;
+      const hl=box(0.05,c.hlY[1]-c.hlY[0]-0.02,0.3,head,F-bw,hy,s*hwN*0.62); hl.rotation.y=-s*0.28; G.add(hl);
+      const dl=box(0.052,0.014,0.28,drl,F-bw+0.004,c.hlY[0]+0.015,s*hwN*0.62); dl.rotation.y=-s*0.28; G.add(dl);
+      const tb=box(0.05,c.tlY[1]-c.tlY[0]-0.04,0.34,tail,-F+0.03,ty,s*hwT*0.62); tb.rotation.y=s*0.16; G.add(tb);
       G.add(box(0.05,0.03,0.12,tail,-F+0.005,sh.B0+0.1,s*hwT*0.78));
     });
-    G.add(box(0.05,0.2,hwN*1.0,black,F,(sh.Tn+sh.Bn)/2-0.03,0));
-    G.add(box(0.05,0.08,hwN*1.35,black,F-0.005,sh.Bn+0.09,0));
+    G.add(box(0.05,0.17,hwN*0.78,black,F-0.004,(c.hlY[0]+c.hlY[1])/2-0.02,0));
+    G.add(box(0.05,0.09,hwN*0.95,black,F-0.012,sh.Bn+0.13,0));
+    G.add(box(0.052,0.05,0.1,chrome,F-0.002,(c.hlY[0]+c.hlY[1])/2-0.01,0));
     G.add(box(0.05,0.12,0.5,mat(0x22252b),-F+0.002,(sh.T0+sh.B0)/2-0.04,0)); // plate recess
     // mirrors, door seams, handles
     [1,-1].forEach(s=>{
-      const mx=c.cowlX-0.12, mz=sh.hwAt(mx)*(1-c.tumble*0.15)+0.07, my=sh.beltAt(mx)+0.09;
-      G.add(box(0.15,0.11,0.14,paint,mx,my,s*mz));
-      G.add(box(0.06,0.03,0.08,black,mx+0.02,my-0.06,s*(mz-0.06)));
+      const mx=c.cowlX-0.34, mz=sh.hwAt(mx)+0.05, my=sh.beltAt(mx)+0.05;
+      const mir=new THREE.Mesh(new THREE.SphereGeometry(1,18,12),paint); mir.scale.set(0.06,0.055,0.09); mir.position.set(mx,my,s*mz); G.add(mir);
+      G.add(box(0.05,0.03,0.07,black,mx,my-0.03,s*(mz-0.05)));
       const seamX=[c.cowlX-0.06, c.bpillar, c.axles[1]+c.r+0.16];
       seamX.forEach(x=>{ const yb=poly(c.bot,x)+0.12, yt=sh.beltAt(x)-0.01; G.add(box(0.006,yt-yb,0.004,black,x,(yb+yt)/2,s*(sh.hwAt(x)+0.002))); });
       [c.bpillar+0.14, seamX[2]+0.14].forEach(x=>G.add(box(0.14,0.025,0.02,c.suv?black:chrome,x,sh.beltAt(x)-0.08,s*(sh.hwAt(x)+0.008))));
