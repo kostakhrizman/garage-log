@@ -351,8 +351,9 @@ window.addEventListener("hashchange",route);
 let openPart=null, armedDel=null;
 function openSheet(pid){ openPart=pid; armedDel=null; renderSheet(true); $("sheet").hidden=false;
   // bring the panel up into the lower part of the screen, keeping the car in view above it
-  requestAnimationFrame(()=>{ const top=$("sheet").getBoundingClientRect().top, want=innerHeight*0.42;
-    if(top>want) scrollBy({top:top-want,behavior:"smooth"}); }); }
+  const top=$("sheet").getBoundingClientRect().top, want=innerHeight*0.42;
+  if(top>want){ const y=scrollY+top-want; window.scrollTo({top:y,behavior:"smooth"});
+    setTimeout(()=>{ if(Math.abs(scrollY-y)>40 && scrollY<y) window.scrollTo(0,y); },700); } }
 function closeSheet(){ openPart=null; $("sheet").hidden=true; }
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
 function renderSheet(fresh){

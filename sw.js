@@ -1,6 +1,6 @@
 // Offline support: the app page is fetched fresh when online (so updates show up)
 // and served from the cache when offline. Libraries and icons are cached on first use.
-const CACHE = "garage-log-v4";
+const CACHE = "garage-log-v5";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
